@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brow Camera</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">Brow&nbsp;Camera</div>
+  <div class="conn"><span id="dot" class="dot"></span><span id="connText">starting…</span></div>
+  <button id="portBtn" title="Release the serial port (e.g. to flash firmware) / take it again">Release port</button>
+  <span class="sep"></span>
+  <span id="fps" class="dim">– fps</span>
+  <span id="ms" class="dim"></span>
+  <span class="grow"></span>
+  <button id="recBtn" title="Save every BROW line and every preview frame to out/cam/rec_*">● Record</button>
+  <button id="snapBtn" title="Save one full-resolution frame to out/cam (pauses tracking ~1 s)">Snapshot</button>
+</header>
+
+<main>
+  <section class="view">
+    <div class="toolbar">
+      <label>Preview
+        <select id="preview" title="Downscaled frames sent between tracked frames; tracking keeps its full rate">
+          <option value="0">off</option>
+          <option value="4">80×60</option>
+          <option value="2" selected>160×120</option>
+          <option value="1">320×240 (slow)</option>
+        </select>
+      </label>
+      <span class="sep"></span>
+      <span class="dim">Draw ROI:</span>
+      <label class="radio"><input type="radio" name="roi" value="L" checked> <b class="cL">L</b> (image left)</label>
+      <label class="radio"><input type="radio" name="roi" value="R"> <b class="cR">R</b> (image right)</label>
+      <label class="radio" title="By default the side of each ROI towards the image centre is the inner (nose) end. Tick for a camera that sees the brows the other way round.">
+        <input type="checkbox" id="swapInner"> nose at image edges</label>
+    </div>
+    <div class="canvasWrap"><canvas id="cam" width="640" height="480"></canvas></div>
+    <p class="hint">Drag on the image to place the selected ROI: from below the hairline to below the brow,
+      with room above it for a full raise. Then hold a neutral face and press <b>Calibrate</b>.</p>
+  </section>
+
+  <section class="side">
+    <div class="card">
+      <h3>Calibration</h3>
+      <div class="row">
+        <button id="calibBtn" class="primary" title="Neutral face: median of N frames, find the brow edges">Calibrate</button>
+        <label>frames <input id="calibN" type="number" min="1" max="30" value="15"></label>
+      </div>
+      <div class="row">
+        <button id="upBtn" title="Hold both brows fully raised, then press: stores the +1 end of the scale">Range ↑ (hold raised)</button>
+        <button id="downBtn" title="Hold both brows fully lowered / frowning, then press: stores the -1 end">Range ↓ (hold lowered)</button>
+      </div>
+      <div class="row">
+        <label class="radio"><input type="checkbox" id="streamChk" checked> stream values</label>
+        <button id="statusBtn">Status</button>
+        <button id="benchBtn" title="Time one tracker update per brow on the board">Bench</button>
+        <button id="resetBtn" class="danger" title="Forget ROIs and calibration on the board">Reset</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Brows <span class="dim" id="unit">px (positive = up)</span></h3>
+      <div class="bars">
+        <div class="bar"><span class="cL">L</span><div class="track"><div id="barL" class="fill fL"></div><div class="zero"></div></div><span id="valL" class="num">–</span></div>
+        <div class="bar"><span class="cR">R</span><div class="track"><div id="barR" class="fill fR"></div><div class="zero"></div></div><span id="valR" class="num">–</span></div>
+      </div>
+      <canvas id="plot" width="460" height="200"></canvas>
+      <div class="row dim small">
+        <label class="radio"><input type="checkbox" id="normChk"> scaled −1…+1 (after Range ↑/↓)</label>
+        <label class="radio"><input type="checkbox" id="endsChk"> inner / outer ends</label>
+      </div>
+    </div>
+
+    <div class="card console">
+      <h3>Console</h3>
+      <pre id="log"></pre>
+      <form id="cmdForm"><input id="cmd" placeholder="command, e.g. help" autocomplete="off"><button>Send</button></form>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

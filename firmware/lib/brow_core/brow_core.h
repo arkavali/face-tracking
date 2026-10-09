@@ -23,7 +23,9 @@ using real = BROW_REAL;
 
 constexpr int kMaxStrips = 8;
 constexpr int kMaxProfile = 255;   // 2 * half_range + 1
-constexpr int kMaxTemplate = 127;  // 2 * ncc_half + 1
+// 2 * ncc_half + 1; ncc_half ~ 4 mm = ROI height * 4 / 30, so 63 covers ROIs up to ~230 px
+// tall. Kept small: a Tracker is saved to NVS as raw bytes (~2 KB each).
+constexpr int kMaxTemplate = 63;
 
 struct Config {
   int strips = 5;

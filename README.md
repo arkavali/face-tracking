@@ -14,6 +14,34 @@ they get their own small camera and tracker.
 Results and recommendations: [docs/feasibility.md](docs/feasibility.md). Regenerate the
 full HTML report with `tools/report.py` (-> `out/report.html`).
 
+## Quick start (double-click in the repo folder)
+
+| File | What it does |
+|---|---|
+| `brow_ui.bat` | Brow camera UI in the browser: live view, draw the brow ROIs with the mouse, calibrate, range up/down, live plots, snapshots and recordings (`out/cam`) |
+| `flash_firmware.bat` | Build `firmware/` and flash the ESP32-CAM (lets the UI release the port while flashing) |
+| `serial_monitor.bat` | Plain text console of the board (close the UI first) |
+| `track_video.bat` | Drag a video, an image folder or a UI recording onto it: offline tracking with ROIs drawn in a window, results open when done (`out/video`) |
+| `report.bat` | Rebuild and open `out/report.html` |
+| `sim_preview.bat` | Simulated mask-camera view for one placement (arguments go to `tools/preview_sim.py`) |
+
+Setup on the board, once per wearer / mounting: in the UI draw a rectangle around each
+brow (from below the hairline to below the brow, room above it for a full raise), hold a
+neutral face and press Calibrate, then hold the brows fully raised -> "Range up", fully
+lowered -> "Range down". ROIs and calibration are kept in flash (NVS).
+
+## Firmware (`firmware/`, AI-Thinker ESP32-CAM, OV2640)
+
+Measured on the board (2026-10-09): one brow update 3-5 ms, both brows ~7.5 ms per frame;
+camera 25 fps grey 320x240. esp32-camera runs the OV2640 at a quarter clock in non-JPEG
+modes (12.5 fps); the firmware sets the sensor clock divider to 1 (`CLKRC` 0x111 = 1) -
+divider 0 is too fast for the I2S DMA (every frame arrives short). The UI preview costs
+~2-3 fps of tracking while it is on. Commands: see the header of `firmware/src/main.cpp`.
+
+Hardware notes: the board is touch-sensitive (touching it can drop the camera); the
+firmware restarts the camera after 2 s without frames (`camera restarts` in `status`).
+The loop task needs a 16 KB stack (the tracker's re-acquire path overflowed 8 KB).
+
 ## How the tracker works (`tools/tracker.py`)
 
 Seen from above, only the upper half of a brow faces the camera: the reliable feature
@@ -48,6 +76,9 @@ The ROI must start below the hairline (hair is a thick dark band too).
 | `track_video.py` | Tracker on real top-down footage (e.g. phone above the brows) with hand-placed ROIs |
 | `metrics.py`, `plots.py`, `report.py` | Summaries, time-series plots, `out/report.html` |
 | `preview_sim.py` | Contact sheet of simulated frames for a camera placement |
+| `ui/browui.py` (+ `index.html`, `app.js`, `style.css`) | Brow camera UI: web page + serial bridge (`brow_ui.bat`) |
+| `brow_cam.py` | Minimal command-line serial helper (snap / setup / monitor / cmd) |
+| `parity_test.py` | C++ core (`firmware/lib/brow_core`) vs Python reference on a video |
 | `blender_inspect_mask.py`, `step_parts.py` | Mask model inspection (STL parts, STEP solids) |
 
 Setup: Python 3.9 venv in `.venv` with `mediapipe opencv-python numpy matplotlib gmsh`.

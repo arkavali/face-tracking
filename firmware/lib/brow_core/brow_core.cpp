@@ -30,7 +30,7 @@ void box(const real* p, int n, int r, real* out) {
 // g[k] = mean(p[k-m:k]) - mean(p[k:k+m]) for k in [m, n-m], -inf elsewhere.
 void edge_strength(const real* p, int n, int m, real* g) {
   // cumulative sums, c[0] = 0
-  real c[kMaxProfile + 1 > 512 ? kMaxProfile + 1 : 512];
+  real c[kMaxProfile + 1];  // larger n (calibration over tall ROIs) uses the heap below
   std::vector<real> big;
   real* cs = c;
   if (n + 1 > static_cast<int>(sizeof(c) / sizeof(c[0]))) {

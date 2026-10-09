@@ -23,7 +23,8 @@ Yes, with conditions that are mostly about where the camera and the LEDs go:
    the spread between people.
 4. The tracker is ported to C++ (`firmware/lib/brow_core`), matches the Python reference
    (double: 1e-10 px, float: <0.001 px on most brows) and needs ~0.1 ms per brow per
-   frame on a PC; an ESP32 estimate is a few ms (measure with the `bench` command).
+   frame on a PC. Measured on the plain ESP32-CAM: 3-5 ms per brow, ~7.5 ms for both, at
+   25 fps camera rate (after raising the OV2640 clock, see README) - the S3 is not needed.
 
 What is NOT proven yet: the real near-IR appearance of the user's brows under 850/940 nm
 LEDs, sweat/specular highlights, and mask slip. These need the real camera (next step).

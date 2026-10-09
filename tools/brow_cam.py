@@ -6,7 +6,7 @@
   python brow_cam.py COM8 monitor          live plot of the BROW lines (Ctrl+C to stop)
   python brow_cam.py COM8 cmd "status"     send one raw command and print the reply
 
-Not tested against real hardware yet (written before the camera was mounted).
+snap tested on the ESP32-CAM; for setup and live plots brow_ui.bat (tools/ui) is more convenient.
 Opening the port with DTR/RTS low avoids resetting the ESP32 on connect.
 """
 from __future__ import annotations

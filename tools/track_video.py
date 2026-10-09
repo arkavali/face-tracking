@@ -1,8 +1,12 @@
 """Run the brow tracker directly on a real video (e.g. a phone held above the brows).
 
+Input: a video file, a folder of images, or a recording folder from the brow camera UI
+(out/cam/rec_*, frames/*.png).
+
 ROIs are given by hand, like the semi-manual calibration on the device:
   --roi NAME x0 y0 x1 y1 INNER   (pixels at the processing size, INNER = left|right:
                                   which ROI side is towards the nose)
+Without --roi a window opens on the first frame to draw them with the mouse.
 The first --calib frames are taken as the neutral face.
 Writes out/video/<stem>_<method>.{npz,png} and an overlay sheet at the extremes.
 """
@@ -29,37 +33,86 @@ def to_grey(frame: np.ndarray, size: tuple, red_weight: float) -> np.ndarray:
     return np.clip(red_weight * r + (1 - red_weight) * g, 0, 255).astype(np.uint8)
 
 
+def read_frames(src: Path, start: int, end: int):
+    """Colour or grey frames from a video file or an image folder, and the frame rate."""
+    if src.is_dir():
+        folder = src / "frames" if (src / "frames").is_dir() else src
+        files = sorted(f for f in folder.iterdir() if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".bmp"))
+        files = files[start:end or None]
+        fps = 5.0
+        times = src / "frames.csv"  # written by the brow camera UI: frame,t,seq
+        if times.exists():
+            t = np.loadtxt(times, delimiter=",", skiprows=1, ndmin=2)[:, 1]
+            if len(t) > 1 and t[-1] > t[0]:
+                fps = (len(t) - 1) / (t[-1] - t[0])
+        return [cv2.imread(str(f)) for f in files], fps
+    cap = cv2.VideoCapture(str(src))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    out, i = [], 0
+    while True:
+        ok, f = cap.read()
+        if not ok or (end and i >= end):
+            break
+        if i >= start:
+            out.append(f)
+        i += 1
+    cap.release()
+    return out, fps
+
+
+def pick_rois(img: np.ndarray) -> list:
+    """Draw the brow ROIs with the mouse on a neutral frame (Enter after each, Esc to finish)."""
+    zoom = max(1, 960 // img.shape[1])
+    big = cv2.resize(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR), None, fx=zoom, fy=zoom, interpolation=cv2.INTER_NEAREST)
+    print("Draw one rectangle per brow (from below the hairline to below the brow, with room above it")
+    print("for a full raise); Enter after each, Esc when done.")
+    rects = cv2.selectROIs("brow ROIs - Enter after each, Esc to finish", big, showCrosshair=False)
+    cv2.destroyAllWindows()
+    rois = []
+    for x, y, w, h in sorted((tuple(int(v) for v in r) for r in rects), key=lambda r: r[0]):
+        x0, y0, x1, y1 = (int(round(v / zoom)) for v in (x, y, x + w, y + h))
+        # the nose is towards the image centre
+        inner = "right" if (x0 + x1) / 2 < img.shape[1] / 2 else "left"
+        rois.append([f"img{'L' if inner == 'right' else 'R'}", x0, y0, x1, y1, inner])
+    if not rois:
+        raise SystemExit("no ROI drawn")
+    print("same ROIs from the command line:", " ".join("--roi " + " ".join(map(str, r)) for r in rois))
+    return rois
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("video", type=Path)
-    ap.add_argument("--size", default="320x180")
-    ap.add_argument("--roi", nargs=6, action="append", required=True,
-                    metavar=("NAME", "X0", "Y0", "X1", "Y1", "INNER"))
-    ap.add_argument("--calib", type=int, default=30,
-                    help="neutral = first N frames; 0 = every 10th frame of the whole range (median face)")
+    ap.add_argument("video", type=Path, help="video file, image folder or brow camera recording folder")
+    ap.add_argument("--size", default="", help="processing size WxH; default 320 wide, source aspect")
+    ap.add_argument("--roi", nargs=6, action="append",
+                    metavar=("NAME", "X0", "Y0", "X1", "Y1", "INNER"), help="omit to draw them with the mouse")
+    ap.add_argument("--open", action="store_true", help="open the result images when done")
+    ap.add_argument("--calib", type=int, default=None,
+                    help="neutral = first N frames (default 30 for videos, 10 for ~5 fps image folders); "
+                         "0 = every 10th frame of the whole range (median face)")
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--end", type=int, default=0)
     ap.add_argument("--method", default="ncc")
     ap.add_argument("--v3", action="store_true", help="use the experimental tracker_v3")
     ap.add_argument("--red", type=float, default=0.85)
     args = ap.parse_args()
-    size = tuple(int(v) for v in args.size.split("x"))
-
-    cap = cv2.VideoCapture(str(args.video))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30
-    frames = []
-    i = 0
-    while True:
-        ok, f = cap.read()
-        if not ok or (args.end and i >= args.end):
-            break
-        if i >= args.start:
-            frames.append(to_grey(f, size, args.red))
-        i += 1
-    cap.release()
+    raw, fps = read_frames(args.video, args.start, args.end)
+    if not raw:
+        raise SystemExit(f"no frames in {args.video}")
+    if args.size:
+        size = tuple(int(v) for v in args.size.split("x"))
+    else:
+        h0, w0 = raw[0].shape[:2]
+        size = (320, int(round(320 * h0 / w0)))
+    frames = [to_grey(f if f.ndim == 3 else cv2.cvtColor(f, cv2.COLOR_GRAY2BGR), size, args.red) for f in raw]
+    del raw
+    if not args.roi:
+        args.roi = pick_rois(frames[0])
 
     cfg = TrackerConfig(method=args.method)
     trackers = {}
+    if args.calib is None:
+        args.calib = 10 if args.video.is_dir() else 30
     calib = frames[:args.calib] if args.calib else frames[::10]
     for name, x0, y0, x1, y1, inner in args.roi:
         tr = (BrowTrackerV3 if args.v3 else BrowTracker)((int(x0), int(y0), int(x1), int(y1)), cfg,
@@ -74,7 +127,7 @@ def main() -> None:
 
     out_dir = OUT / "video"
     out_dir.mkdir(parents=True, exist_ok=True)
-    stem = f"{args.video.stem}_{'v3' if args.v3 else args.method}"
+    stem = f"{args.video.stem or args.video.resolve().name}_{'v3' if args.v3 else args.method}"
     pack = {}
     for n, rs in res.items():
         for k in ("raise", "inner", "outer", "valid"):
@@ -127,6 +180,11 @@ def main() -> None:
     rows = [np.hstack(tiles[i:i + 3]) for i in range(0, len(tiles) - len(tiles) % 3, 3)]
     cv2.imwrite(str(out_dir / f"{stem}_sheet.png"), np.vstack(rows))
     print(out_dir / f"{stem}.png")
+    if args.open:
+        import os
+
+        for f in (f"{stem}.png", f"{stem}_sheet.png"):
+            os.startfile(out_dir / f)
 
 
 if __name__ == "__main__":

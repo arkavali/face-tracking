@@ -44,6 +44,7 @@ def main() -> None:
     ap.add_argument("--ir", type=float, default=0.7, help="IR local-contrast factor (1 = visible light)")
     ap.add_argument("--glasses", action="store_true")
     ap.add_argument("--frames", type=int, nargs="*", default=[0, 30, 60, 90])
+    ap.add_argument("--open", action="store_true", help="open the contact sheet when done")
     args = ap.parse_args()
     neutral = args.neutral.format(a=args.actor)
     clip = args.clip.format(a=args.actor)
@@ -82,6 +83,10 @@ def main() -> None:
     dst = OUT / f"preview_{clip}_{args.mode}_y{args.cam_y:.0f}_z{args.cam_z:.0f}_t{args.flange_top:.0f}{'_nh' if args.no_holder else ''}{'_g' if args.glasses else ''}.png"
     cv2.imwrite(str(dst), sheet)
     print(dst)
+    if args.open:
+        import os
+
+        os.startfile(dst)
     for s in "RL":
         cam = cams.get(s) or cams["C"]
         print(s, "px/mm at brow:", round(cam.px_per_mm_at(an.brow_center[s]), 2),
