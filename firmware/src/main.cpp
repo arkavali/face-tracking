@@ -213,8 +213,8 @@ void finishCalibration() {
 }  // namespace
 
 void setup() {
+  Serial.setTxBufferSize(4096);  // must come before begin() on arduino-esp32
   Serial.begin(921600);
-  Serial.setTxBufferSize(4096);
   delay(300);
   bool cam = initCamera();
   for (int attempt = 0; !cam && attempt < 5; ++attempt) {
