@@ -219,6 +219,11 @@ class Bridge:
         if not s:
             return False
         data = "".join(ln.strip() + "\n" for ln in text.splitlines() if ln.strip())
+        if not data:
+            return True
+        # leading newline: ends whatever partial line the board may hold (noise around a
+        # reset), which would otherwise be glued to the first command and reject it
+        data = "\n" + data
         try:
             with self.wlock:
                 s.write(data.encode())
@@ -226,7 +231,8 @@ class Bridge:
             self._drop(only=s)
             return False
         for ln in data.splitlines():
-            self.hub.publish({"t": "line", "s": "> " + ln})
+            if ln:
+                self.hub.publish({"t": "line", "s": "> " + ln})
         return True
 
     # ---- reader

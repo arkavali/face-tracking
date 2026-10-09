@@ -299,11 +299,16 @@ $("cmdForm").onsubmit = (e) => {
   if (c) send(c);
   $("cmd").value = "";
 };
-// tracked frames per second, from the BROW lines of the last 2 s
+// tracked frames per second, from the BROW lines of the last 2 s; if values should be
+// streaming but none arrive (a command lost around a board reset), ask again
+let quietSec = 0;
 setInterval(() => {
   const now = performance.now() / 1000;
   const n = hist.filter((h) => h.t > now - 2).length;
-  if (n) $("fps").textContent = `${(n / 2).toFixed(1)} fps`;
+  $("fps").textContent = n ? `${(n / 2).toFixed(1)} fps` : "no values";
+  const calibrated = (rois.L && rois.L.cal) || (rois.R && rois.R.cal);
+  quietSec = connected && calibrated && $("streamChk").checked && !n ? quietSec + 1 : 0;
+  if (quietSec >= 3) { quietSec = 0; send("stream on"); }
 }, 1000);
 
 $("preview").value = load("preview", "2");

@@ -8,7 +8,7 @@
 //                                      left/right; last word = which ROI side faces the nose
 //   calib [n]                          neutral face: average n frames (default 15) and calibrate
 //   range up|down                      store the current raise as the +1 / -1 end of the scale
-//   stream on|off                      print one BROW line per frame
+//   stream on|off                      print one BROW line per frame (on after power-up)
 //   snap                               dump the current frame: "SNAP 320 240\n" + raw bytes
 //                                      (blocks tracking for ~0.9 s)
 //   preview off|1|2|4                  keep sending frames downscaled 1/2/4x for the PC UI, in
@@ -17,6 +17,8 @@
 //   curve                              calibrated curves: "CURVE L|R a b c sx0 sx1 sx2 .. sxN"
 //                                      (y = a x^2 + b x + c in image px, strip edges sx)
 //   bench                              time one tracker update on the current frame
+//   exp auto|N                         exposure: automatic, or fixed N lines with auto gain
+//                                      (experimental: dim light makes auto exposure drop fps)
 //   reg ADDR [VALUE]                   read / write a camera register (hex, debugging)
 //   status                             ROIs, calibration, frame rate
 //   reset                              forget ROIs and calibration
@@ -48,7 +50,7 @@ float rangeUp[2] = {0, 0};
 float rangeDown[2] = {0, 0};
 float lastRaise[2] = {0, 0};
 Preferences prefs;
-bool streaming = false;
+bool streaming = true;  // the values are the device's output: on from power-up
 int calibWanted = 0;
 int calibHave = 0;
 uint8_t* calibBuf = nullptr;  // PSRAM, kMaxCalib frames
@@ -208,7 +210,7 @@ void handleCommand(String cmd) {
   if (w == "help") {
     Serial.println(
         "roi L|R x0 y0 x1 y1 left|right | calib [n] | range up|down | stream on|off | snap | preview off|1|2|4 | "
-        "curve | bench | reg ADDR [VALUE] | status | reset");
+        "curve | bench | exp auto|N | reg ADDR [VALUE] | status | reset");
   } else if (w == "roi") {
     char side = 0;
     int x0, y0, x1, y1;
@@ -286,6 +288,23 @@ void handleCommand(String cmd) {
       Serial.printf(" %d\n", t.strip_x1[S - 1]);
     }
     Serial.println("CURVE end");
+  } else if (w == "exp") {
+    // exp auto | exp N: automatic exposure, or a fixed exposure of N lines (0..1200) with
+    // the gain still automatic. In dim light auto exposure stretches frames (25 -> 3-8 fps).
+    sensor_t* sen = esp_camera_sensor_get();
+    int v = -1;
+    if (!sen || (cmd.indexOf("auto") < 0 && sscanf(cmd.c_str(), "exp %d", &v) != 1)) {
+      Serial.println("ERR usage: exp auto | exp N (0..1200)");
+      return;
+    }
+    if (v < 0) {
+      sen->set_exposure_ctrl(sen, 1);
+    } else {
+      sen->set_exposure_ctrl(sen, 0);
+      sen->set_aec_value(sen, constrain(v, 0, 1200));
+    }
+    sen->set_gain_ctrl(sen, 1);
+    Serial.printf("OK exp %s\n", v < 0 ? "auto" : String(v).c_str());
   } else if (w == "reg") {
     // reg ADDR [VALUE]: read / write a camera register (hex). OV2640: 0x1xx = sensor bank,
     // 0x0xx = DSP bank (esp32-camera convention).
@@ -317,7 +336,8 @@ void pollSerial() {
     if (ch == '\n' || ch == '\r') {
       if (line.length()) handleCommand(line);
       line = "";
-    } else if (line.length() < 96) {
+    } else if (ch >= ' ' && ch <= '~' && line.length() < 96) {
+      // printable only: line noise around a reset must not stick to the next command
       line += ch;
     }
   }
