@@ -234,12 +234,17 @@ def main() -> None:
     ap.add_argument("--method", default="edge")
     ap.add_argument("--strips", type=int, default=5)
     ap.add_argument("--viz-every", type=int, default=0)
+    ap.add_argument("--cfg", nargs="*", default=[], help="TrackerConfig overrides, key=value")
     args = ap.parse_args()
     w, h = (int(v) for v in args.res.split("x"))
     rig = Rig(mode=args.mode, cam_y=args.cam_y, cam_z=args.cam_z, flange_top=args.flange_top, arm=not args.no_arm, lateral_mm=args.lateral,
               width=w, height=h, dfov_deg=args.dfov, lights=tuple(args.lights.split(",")))
     look = Look(ir_contrast=args.ir, noise_read=args.noise)
     tcfg = TrackerConfig(method=args.method, strips=args.strips)
+    for kv in args.cfg:
+        k, v = kv.split("=")
+        cur = getattr(tcfg, k)
+        tcfg = replace(tcfg, **{k: type(cur)(v)})
     out_dir = OUT / "eval" / args.config
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "config.json").write_text(json.dumps({

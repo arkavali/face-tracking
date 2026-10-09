@@ -111,7 +111,7 @@ void Tracker::setup(int ax0, int ay0, int ax1, int ay1, bool inner_is_right, con
   double ppm = std::max(y1 - y0, 10) / 30.0;
   if (!cfg_.half_range) cfg_.half_range = std::max(12, rint_even(cfg.range_mm * ppm));
   if (!cfg_.edge_half) cfg_.edge_half = std::max(2, rint_even(1.2 * ppm));
-  if (!cfg_.search) cfg_.search = std::max(4, rint_even(2.5 * ppm));
+  if (!cfg_.search) cfg_.search = std::max(4, rint_even(cfg.search_mm * ppm));
   if (!cfg_.ncc_half) cfg_.ncc_half = std::max(5, rint_even(4 * ppm));
   cfg_.half_range = std::min(cfg_.half_range, (kMaxProfile - 1) / 2);
   cfg_.ncc_half = std::min(cfg_.ncc_half, (kMaxTemplate - 1) / 2);
@@ -266,6 +266,7 @@ Result Tracker::update(const uint8_t* img, int w, int h) {
     int hi = std::min(2 * K + 1 - margin, c + srch + 1);
     for (int k = 0; k < n; ++k) g[k] = kNegInf;
     real best = -2;
+    real best_pen = kNegInf;
     int bi = lo;
     for (int cc = lo; cc < hi; ++cc) {
       const real* wv = p + cc - hn;
@@ -282,7 +283,10 @@ Result Tracker::update(const uint8_t* img, int w, int h) {
       for (int i = 0; i < len; ++i) acc += tz_[s][i] * ((wv[i] - mean) / sd);
       real val = acc / len;
       g[cc] = val;
-      if (val > best) {
+      // optional prior: prefer matches near the previous position
+      real vp = cfg_.dist_penalty != 0 ? val - cfg_.dist_penalty * real(std::abs(cc - c)) / srch : val;
+      if (vp > best_pen) {
+        best_pen = vp;
         best = val;
         bi = cc;
       }

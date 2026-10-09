@@ -34,8 +34,16 @@ def describe(cfg: dict) -> str:
 
 
 def main() -> None:
+    import argparse
+    import fnmatch
+
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--configs", default="*_v3", help="glob of config names to include")
+    args = ap.parse_args()
     rows, sections = [], []
     for summ in sorted((OUT / "eval").glob("*/summary.json")):
+        if not fnmatch.fnmatch(summ.parent.name, args.configs) or summ.parent.name.startswith("smoke"):
+            continue
         d = json.loads(summ.read_text())
         cdir = summ.parent
         cfg_path = cdir / "config.json"
@@ -54,6 +62,35 @@ def main() -> None:
         sections.append(f"<section id='{name}'><h2>{html.escape(name)}</h2><p>{html.escape(desc)}</p>"
                         f"<table class='small'><tr><th>actor</th><th>brow</th>"
                         + "".join(f"<th>{h}</th>" for _, h, _ in COLS) + f"</tr>{per}</table>{imgs}</section>")
+    # Real footage of the user (not simulated): aligned frontal clips vs MediaPipe, and
+    # top-down phone clips where MediaPipe finds no face at all.
+    real = []
+    stab_rows = []
+    for js in sorted((OUT / "stab").glob("*_ncc.json")):
+        d = json.loads(js.read_text())
+        for s in "RL":
+            v = d[s]
+            stab_rows.append(f"<tr><td>{html.escape(js.stem)}</td><td>{s}</td><td>{v['r_raise']:.2f}</td>"
+                             f"<td>{v['r_inner']:.2f}</td><td>{v['r_outer']:.2f}</td><td>{v['slope']:.2f}</td>"
+                             f"<td>{v['rmse_after_fit_mm']:.2f}</td><td>{v['mp_span_mm']:.1f}</td><td>{v['frames']}</td></tr>")
+    if stab_rows:
+        real.append("<h2 id='real'>Real footage of the user: tracker vs MediaPipe on aligned frontal frames</h2>"
+                    "<p>Frames aligned to a neutral frame with a similarity transform on rigid landmarks "
+                    "(camera 'fixed to the head'); no mask-camera angle, no IR. Slope = tracker mm per MediaPipe mm; "
+                    "RMSE after a linear fit (the per-user range calibration).</p><table class='small'><tr>"
+                    "<th>clip</th><th>brow</th><th>r raise</th><th>r inner</th><th>r outer</th><th>slope</th>"
+                    "<th>RMSE, mm</th><th>MP span, mm</th><th>frames</th></tr>" + "".join(stab_rows) + "</table>")
+        real += [f"<img src='stab/{p.name}' loading='lazy'>" for p in sorted((OUT / "stab").glob("*_ncc.png"))]
+    vids = sorted((OUT / "video").glob("*.png"))
+    if vids:
+        real.append("<h2>Real top-down footage (phone above the brows, MediaPipe finds no face)</h2>"
+                    "<p>Hand-placed ROIs, tracker only; orange = tracked edge, green = neutral curve, red = strip "
+                    "rejected. The phone was hand-held, so part of the motion is the camera.</p>")
+        real += [f"<img src='video/{p.name}' loading='lazy'>" for p in vids if "edge" not in p.name]
+    if (OUT / "gallery_views.png").exists():
+        real.append("<h2>What the mask camera sees (simulated, frame 0, actors 1 and 4)</h2>"
+                    "<img src='gallery_views.png' loading='lazy'>")
+    sections = real + sections
     head = "".join(f"<th>{h}</th>" for _, h, _ in COLS)
     page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Brow Tracker Sims</title>
 <style>

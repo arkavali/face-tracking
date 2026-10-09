@@ -36,6 +36,8 @@ struct Config {
   real min_edge = 4;
   real min_ncc = real(0.5);
   real range_mm = 15;
+  real search_mm = real(2.5);
+  real dist_penalty = 0;  // NCC penalty per search radius of distance from the previous shift
   real cand_frac = real(0.25);
   int lost_frames = 15;  // invalid this many frames in a row -> search the whole range
 };

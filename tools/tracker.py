@@ -42,6 +42,8 @@ class TrackerConfig:
     min_edge: float = 4.0    # minimum edge strength (grey levels)
     min_ncc: float = 0.5
     range_mm: float = 15.0   # profile half-range when half_range is derived from the ROI
+    search_mm: float = 2.5   # per-frame search radius when search is derived from the ROI
+    dist_penalty: float = 0.0  # NCC penalty per search radius of distance from the previous position
     cand_frac: float = 0.25  # calibration: edge candidates down to this share of the column's strongest
     lost_frames: int = 15    # invalid this many frames in a row -> search the whole range again
 
@@ -83,7 +85,7 @@ class BrowTracker:
             cfg,
             half_range=cfg.half_range or max(12, int(round(cfg.range_mm * ppm))),
             edge_half=cfg.edge_half or max(2, int(round(1.2 * ppm))),
-            search=cfg.search or max(4, int(round(2.5 * ppm))),
+            search=cfg.search or max(4, int(round(cfg.search_mm * ppm))),
             ncc_half=cfg.ncc_half or max(5, int(round(4 * ppm))),
         )
         self.inner_is_right = inner_is_right   # which ROI side is towards the nose
@@ -194,13 +196,15 @@ class BrowTracker:
             else:
                 t = self.templates[s][K - cfg.ncc_half:K + cfg.ncc_half + 1]
                 t = (t - t.mean()) / (t.std() + 1e-6)
-                best, bi, vals = -2.0, lo, {}
+                best, bi, vals, best_pen = -2.0, lo, {}, -np.inf
                 for cc in range(lo, hi):
                     w = p[cc - cfg.ncc_half:cc + cfg.ncc_half + 1]
                     v = float(np.mean(t * (w - w.mean()) / (w.std() + 1e-6)))
                     vals[cc] = v
-                    if v > best:
-                        best, bi = v, cc
+                    # optional prior: prefer matches near the previous position
+                    vp = v - cfg.dist_penalty * abs(cc - c) / S if cfg.dist_penalty else v
+                    if vp > best_pen:
+                        best_pen, best, bi = vp, v, cc
                 g = np.array([vals.get(c, -np.inf) for c in range(2 * K + 1)])
                 pos = _parabola(g, bi) - K
                 score[s] = best
