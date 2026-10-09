@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from pathlib import Path
 
 import cv2
 import mediapipe as mp
@@ -74,11 +75,21 @@ def label_clip(path, out_path) -> int:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--actors", type=int, nargs="+", required=True)
+    ap.add_argument("--actors", type=int, nargs="*", default=[])
+    ap.add_argument("--videos", type=Path, nargs="*", default=[],
+                    help="arbitrary videos; labels go to <video dir>/../teacher/<stem>.npz")
     ap.add_argument("--emotions", type=int, nargs="*", default=None,
                     help="RAVDESS emotion codes to keep (default: all)")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
+    for v in args.videos:
+        out = v.parent.parent / "teacher" / f"{v.stem}.npz"
+        if out.exists() and not args.force:
+            continue
+        n = label_clip(v, out)
+        d = np.load(out)
+        found = int((~np.isnan(d["lm"][:, 0, 0])).sum())
+        print(f"{v.name}: {n} frames, face found in {found}", flush=True)
     for actor in args.actors:
         clips = sorted(actor_dir("videos", actor).glob("02-*.mp4"))
         t0, frames = time.time(), 0

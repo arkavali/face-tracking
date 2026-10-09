@@ -32,13 +32,18 @@ import numpy as np
 class TrackerConfig:
     method: str = "edge"     # "edge" | "ncc"
     strips: int = 5
-    half_range: int = 24     # K: profile spans curve-K .. curve+K rows
-    edge_half: int = 3       # m: edge filter half width (rows)
+    # Window sizes in rows. 0 = derive from the ROI height at calibration: the ROI
+    # covers ~30 mm vertically (brow + 14 mm above + 8 mm below), so ROI/30 ~ px/mm.
+    half_range: int = 0      # K: profile spans curve-K .. curve+K rows (~12 mm)
+    edge_half: int = 0       # m: edge filter half width (~1.2 mm)
+    search: int = 0          # S: max change per frame (~2.5 mm)
+    ncc_half: int = 0        # neutral template rows each side of the edge (~4 mm)
     smooth: int = 1          # box radius for profile smoothing
-    search: int = 8          # S: max change per frame (rows)
     min_edge: float = 4.0    # minimum edge strength (grey levels)
     min_ncc: float = 0.5
-    ncc_half: int = 10       # rows of the neutral template on each side of the edge
+    range_mm: float = 15.0   # profile half-range when half_range is derived from the ROI
+    cand_frac: float = 0.25  # calibration: edge candidates down to this share of the column's strongest
+    lost_frames: int = 15    # invalid this many frames in a row -> search the whole range again
 
 
 def _box(p: np.ndarray, r: int) -> np.ndarray:
@@ -71,26 +76,62 @@ def _parabola(g: np.ndarray, i: int) -> float:
 
 class BrowTracker:
     def __init__(self, roi: tuple, cfg: TrackerConfig = TrackerConfig(), inner_is_right: bool = True):
+        from dataclasses import replace
         self.x0, self.y0, self.x1, self.y1 = (int(v) for v in roi)
-        self.cfg = cfg
+        ppm = max(self.y1 - self.y0, 10) / 30.0
+        self.cfg = replace(
+            cfg,
+            half_range=cfg.half_range or max(12, int(round(cfg.range_mm * ppm))),
+            edge_half=cfg.edge_half or max(2, int(round(1.2 * ppm))),
+            search=cfg.search or max(4, int(round(2.5 * ppm))),
+            ncc_half=cfg.ncc_half or max(5, int(round(4 * ppm))),
+        )
         self.inner_is_right = inner_is_right   # which ROI side is towards the nose
         self.curve = None
         self.prev = None
         self.templates = None
+        self.lost = 0
 
     # ------------------------------------------------------------------ calibration
+    def _topmost_brow_edge(self, p: np.ndarray, g: np.ndarray):
+        """Index of the TOPMOST bright->dark step that is at least cand_frac of the strongest
+        one and has a brow-thick (~3.6 mm) dark band below it, or None.
+
+        The brow is the first dark band below the forehead; the glasses rim, the eyelid
+        crease and the eye are all below it and often have MORE contrast (a black rim
+        can be twice as strong), so "strongest edge" picks the wrong thing. Thin forehead
+        wrinkles fail the band test. The ROI must start below the hairline.
+        """
+        band = 3 * self.cfg.edge_half
+        fin = np.isfinite(g)
+        if not fin.any():
+            return None
+        gmax = g[fin].max()
+        if gmax < self.cfg.min_edge:
+            return None
+        thr = max(self.cfg.min_edge, self.cfg.cand_frac * gmax)
+        for i in range(1, len(g) - 1):
+            if not (fin[i] and g[i] >= thr and g[i] >= g[i - 1] and g[i] >= g[i + 1]):
+                continue
+            if i - band < 0 or i + band > len(p):
+                continue
+            if p[i - band:i].mean() - p[i:i + band].mean() >= 0.6 * g[i]:
+                return i
+        return None
+
     def _column_edges(self, img: np.ndarray):
+        """Per column: the topmost brow-like step (see _topmost_brow_edge)."""
         roi = img[self.y0:self.y1, self.x0:self.x1].astype(np.float32)
         xs, ys, ws = [], [], []
         m = self.cfg.edge_half
         for j in range(roi.shape[1]):
             p = _box(roi[:, j], self.cfg.smooth)
             g = _edge_strength(p, m)
-            i = int(np.argmax(g))
-            if np.isfinite(g[i]) and g[i] > self.cfg.min_edge:
+            pick = self._topmost_brow_edge(p, g)
+            if pick is not None:
                 xs.append(self.x0 + j)
-                ys.append(self.y0 + _parabola(g, i))
-                ws.append(g[i])
+                ys.append(self.y0 + _parabola(g, pick))
+                ws.append(g[pick])
         return np.array(xs, float), np.array(ys, float), np.array(ws, float)
 
     def calibrate(self, frames: list) -> bool:
@@ -140,8 +181,10 @@ class BrowTracker:
         score = np.zeros(cfg.strips)
         for s in range(cfg.strips):
             p = _box(self._profile(img, s), cfg.smooth)
-            lo = int(max(cfg.edge_half, round(self.prev[s]) + K - S))
-            hi = int(min(2 * K + 1 - cfg.edge_half, round(self.prev[s]) + K + S + 1))
+            margin = max(cfg.edge_half, cfg.ncc_half if cfg.method == "ncc" else 0)
+            c = int(np.clip(round(self.prev[s]) + K, margin, 2 * K - margin))
+            lo = max(margin, c - S)
+            hi = min(2 * K + 1 - margin, c + S + 1)
             if cfg.method == "edge":
                 g = _edge_strength(p, cfg.edge_half)
                 i = lo + int(np.argmax(g[lo:hi]))
@@ -152,12 +195,12 @@ class BrowTracker:
                 t = self.templates[s][K - cfg.ncc_half:K + cfg.ncc_half + 1]
                 t = (t - t.mean()) / (t.std() + 1e-6)
                 best, bi, vals = -2.0, lo, {}
-                for c in range(max(lo, cfg.ncc_half), min(hi, 2 * K + 1 - cfg.ncc_half)):
-                    w = p[c - cfg.ncc_half:c + cfg.ncc_half + 1]
+                for cc in range(lo, hi):
+                    w = p[cc - cfg.ncc_half:cc + cfg.ncc_half + 1]
                     v = float(np.mean(t * (w - w.mean()) / (w.std() + 1e-6)))
-                    vals[c] = v
+                    vals[cc] = v
                     if v > best:
-                        best, bi = v, c
+                        best, bi = v, cc
                 g = np.array([vals.get(c, -np.inf) for c in range(2 * K + 1)])
                 pos = _parabola(g, bi) - K
                 score[s] = best
@@ -166,6 +209,25 @@ class BrowTracker:
                 off[s] = pos
             else:
                 off[s] = self.prev[s]
+        # The strips belong to one brow: a strip far from the others has jumped to some
+        # other edge (glasses rim, wrinkle, eyelid) - pull it back to the group.
+        if ok.sum() >= 3:
+            med = np.median(off[ok])
+            far = np.abs(off - med) > max(3.0, 0.5 * K)
+            ok &= ~far
+            off[far] = med
+        # Lost for a while (occlusion, blink, mask shifted): look for the brow again over
+        # the whole range with the calibration rule instead of trusting the old position.
+        self.lost = self.lost + 1 if ok.mean() < 0.5 else 0
+        if cfg.lost_frames and self.lost >= cfg.lost_frames:
+            for s in range(cfg.strips):
+                p = _box(self._profile(img, s), cfg.smooth)
+                g = _edge_strength(p, cfg.edge_half)
+                i = self._topmost_brow_edge(p, g)
+                if i is not None:
+                    off[s] = _parabola(g, i) - K
+                    ok[s] = True
+            self.lost = 0
         self.prev = off.copy()
         n = cfg.strips
         inner = slice(n - 2, n) if self.inner_is_right else slice(0, 2)

@@ -161,27 +161,31 @@ class FisheyeCamera:
 
 @dataclass
 class Rig:
-    """Camera placement, defined like the CAD: relative to the AR mirror holder's top flange.
+    """Camera placement in the head frame plus the AR mirror holder geometry.
 
-    Holder (per eye, from the user's CAD, 2026-10-09): the top flange sits ~29 mm above
-    the eye centre and its tip is ~16 mm in front of the brow skin. The camera goes above
-    the holder: cam_up above the flange top and cam_fwd in front of the flange tip, i.e.
-    the red dot in the CAD side view was about cam_up=28, cam_fwd=24.
+    Holder (per eye, from the user's CAD sections, 2026-10-09): a vertical mirror frame
+    ~50 mm wide, 58 mm tall, its top ~29 mm above the eye centre and its face ~31.7 mm in
+    front of the brow; from the frame's outer top corner a narrow arm (~5 mm) runs
+    diagonally towards the face and ends ~14 mm in front of the brow, just inside of
+    the eye centre. The camera sits above the holder: cam_y above the eye-corner line,
+    cam_z in front of the brow skin. The red dot in the CAD side view was ~(57, 39).
     """
     mode: str = "side"           # "side": one camera per brow, "center": one camera for both
-    cam_up: float = 28.0
-    cam_fwd: float = 24.0
+    cam_y: float = 57.0
+    cam_z: float = 39.0
     lateral_mm: float = 0.0      # side mode: shift the camera outwards (+) from above the eye
     aim_down_mm: float = 0.0     # aim below the brow centre
     flange_top: float = 29.0     # holder top above the eye-corner line
-    flange_gap: float = 16.0     # holder tip in front of the brow skin
+    plate_gap: float = 31.7      # mirror frame face in front of the brow skin
+    arm_gap: float = 14.0        # arm tip in front of the brow skin
+    arm: bool = True
     width: int = 320
     height: int = 240
     dfov_deg: float = 120.0
 
     def cameras(self, an: Anchors) -> dict:
-        y = self.flange_top + self.cam_up
-        z = an.skin_z + self.flange_gap + self.cam_fwd
+        y = self.cam_y
+        z = an.skin_z + self.cam_z
         cams = {}
         if self.mode == "side":
             for s in "RL":
@@ -202,8 +206,10 @@ class Rig:
     below_weight: float = 1.0
 
     def occluders(self, an: Anchors, key: str) -> list:
-        sides = "RL" if key == "C" else key
-        return [holder_flange(an, s, self.flange_top, self.flange_gap) for s in sides]
+        quads = []
+        for s in ("RL" if key == "C" else key):
+            quads += holder(an, s, self.flange_top, self.plate_gap, self.arm_gap, self.arm)
+        return quads
 
     def light_list(self, an: Anchors, key: str, cam: FisheyeCamera) -> list:
         out = []
@@ -252,15 +258,24 @@ class Quad:
     level: float = 25.0    # grey level before lighting
 
 
-def holder_flange(an: Anchors, side: str, top_y: float = 29.0, gap_mm: float = 16.0,
-                  depth_mm: float = 30.0, half_width: float = 30.0) -> Quad:
-    """Top of the AR mirror holder: a horizontal slab gap_mm in front of the brow skin,
-    top_y mm above the eye-corner line, extending depth_mm towards the camera."""
-    x0 = an.eye_center[side][0]
-    z0 = an.skin_z + gap_mm
-    pts = np.array([[x0 - half_width, top_y, z0], [x0 + half_width, top_y, z0],
-                    [x0 + half_width, top_y, z0 + depth_mm], [x0 - half_width, top_y, z0 + depth_mm]])
-    return Quad(pts, 25.0)
+def holder(an: Anchors, side: str, top_y: float = 29.0, plate_gap: float = 31.7,
+           arm_gap: float = 14.0, arm: bool = True, half_width: float = 25.0,
+           height: float = 58.0, arm_width: float = 5.0) -> list:
+    """AR mirror holder of one eye: the vertical mirror frame plus its diagonal top arm."""
+    ex = an.eye_center[side][0]
+    out = -1.0 if side == "R" else 1.0            # lateral direction in head x
+    zp = an.skin_z + plate_gap
+    quads = [Quad(np.array([[ex - half_width, top_y, zp], [ex + half_width, top_y, zp],
+                            [ex + half_width, top_y - height, zp], [ex - half_width, top_y - height, zp]]), 25.0)]
+    if arm:
+        a = np.array([ex + out * (half_width + 6.0), top_y, zp])   # outer top corner of the frame
+        b = np.array([ex - out * 3.0, top_y, an.skin_z + arm_gap])  # tip, just inside the eye centre
+        d = b - a
+        n = np.array([-d[2], 0.0, d[0]])
+        n *= arm_width / 2 / np.linalg.norm(n)
+        quads.append(Quad(np.array([a + n, b + n, b - n, a - n]), 25.0))          # top face
+        quads.append(Quad(np.array([b + n, b - n, b - n - [0, 6, 0], b + n - [0, 6, 0]]), 25.0))  # tip clip
+    return quads
 
 
 def glasses_rim(an: Anchors, rim_y: float = 15.0, lens_gap: float = 14.0,
@@ -427,15 +442,18 @@ def render(tex: np.ndarray, src_px: np.ndarray, head: np.ndarray, fwd: np.ndarra
         grid = ((1 - s)[:, None, None] * ((1 - s)[None, :, None] * a + s[None, :, None] * b) +
                 s[:, None, None] * ((1 - s)[None, :, None] * d4 + s[None, :, None] * c4))
         guv, gd, gok = cam.project(grid)
-        m = np.zeros((H, W), np.uint8)
+        m = np.zeros((H, W), bool)
+        cell = np.zeros((H, W), np.uint8)
         for i in range(n):
             for j in range(n):
                 if gok[i, j] and gok[i, j + 1] and gok[i + 1, j + 1] and gok[i + 1, j]:
                     poly = np.array([guv[i, j], guv[i, j + 1], guv[i + 1, j + 1], guv[i + 1, j]])
-                    cv2.fillConvexPoly(m, np.round(poly * 16).astype(np.int32), 1, lineType=cv2.LINE_8, shift=4)
+                    cell[:] = 0
+                    cv2.fillConvexPoly(cell, np.round(poly * 16).astype(np.int32), 1, lineType=cv2.LINE_8, shift=4)
+                    cd = gd[i:i + 2, j:j + 2].mean()
+                    m |= cell.astype(bool) & (depth > cd)      # only where it is in front of the face
         if not m.any():
             continue
-        m = m.astype(bool)
         lvl = q.level * (d_ref / max(float(gd[gok].mean()), 1.0)) ** 2
         out[m] = lvl
         occ |= m

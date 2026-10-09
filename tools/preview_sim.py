@@ -37,8 +37,8 @@ def main() -> None:
     ap.add_argument("--neutral", default="02-01-01-01-01-01-{a:02d}")
     ap.add_argument("--clip", default="02-01-08-02-01-01-{a:02d}")
     ap.add_argument("--mode", default="side")
-    ap.add_argument("--up", type=float, default=28, help="camera height above the holder top, mm")
-    ap.add_argument("--fwd", type=float, default=24, help="camera distance in front of the holder tip, mm")
+    ap.add_argument("--cam-y", type=float, default=57, help="camera height above the eye line, mm")
+    ap.add_argument("--cam-z", type=float, default=39, help="camera distance in front of the brow skin, mm")
     ap.add_argument("--no-holder", action="store_true")
     ap.add_argument("--flange-top", type=float, default=29.0, help="holder top above the eye line, mm")
     ap.add_argument("--ir", type=float, default=0.7, help="IR local-contrast factor (1 = visible light)")
@@ -51,7 +51,7 @@ def main() -> None:
     _, ntr = load(args.actor, neutral)
     an = Anchors.from_track(ntr)
     d, tr = load(args.actor, clip)
-    rig = Rig(mode=args.mode, cam_up=args.up, cam_fwd=args.fwd, flange_top=args.flange_top)
+    rig = Rig(mode=args.mode, cam_y=args.cam_y, cam_z=args.cam_z, flange_top=args.flange_top)
     cams = rig.cameras(an)
     look = Look(ir_contrast=args.ir)
     shades = {k: led_shading(an.ref_head, an.ref_fwd, c, look.ambient) for k, c in cams.items()}
@@ -79,7 +79,7 @@ def main() -> None:
         rows.append(np.hstack([small] + tiles))
     sheet = np.vstack(rows)
     OUT.mkdir(exist_ok=True)
-    dst = OUT / f"preview_{clip}_{args.mode}_u{args.up:.0f}_f{args.fwd:.0f}_t{args.flange_top:.0f}{'_nh' if args.no_holder else ''}{'_g' if args.glasses else ''}.png"
+    dst = OUT / f"preview_{clip}_{args.mode}_y{args.cam_y:.0f}_z{args.cam_z:.0f}_t{args.flange_top:.0f}{'_nh' if args.no_holder else ''}{'_g' if args.glasses else ''}.png"
     cv2.imwrite(str(dst), sheet)
     print(dst)
     for s in "RL":

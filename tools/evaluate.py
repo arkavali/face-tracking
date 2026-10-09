@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -28,6 +29,9 @@ from camsim import (Anchors, Look, Rig, brow_gt, glasses_rim, head_track, ir_tex
                     led_shading, render)
 from common import BROW, BS_BROW, OUT, actor_dir, parse_ravdess
 from tracker import BrowTracker, TrackerConfig
+
+if os.environ.get("BROW_SINGLE_THREAD"):
+    cv2.setNumThreads(1)
 
 CALIB_FRAMES = 30
 ROI_UP_MM, ROI_DOWN_MM, ROI_SIDE_MM = 14.0, 8.0, 3.0
@@ -216,8 +220,10 @@ def main() -> None:
     ap.add_argument("--emotions", type=int, nargs="*", default=None)
     ap.add_argument("--max-clips", type=int, default=0)
     ap.add_argument("--mode", default="side")
-    ap.add_argument("--up", type=float, default=28.0)
-    ap.add_argument("--fwd", type=float, default=24.0)
+    ap.add_argument("--cam-y", type=float, default=57.0, help="camera height above the eye line, mm")
+    ap.add_argument("--cam-z", type=float, default=39.0, help="camera distance in front of the brow skin, mm")
+    ap.add_argument("--no-arm", action="store_true", help="holder without its diagonal top arm")
+    ap.add_argument("--lateral", type=float, default=0.0, help="side camera shifted outwards, mm")
     ap.add_argument("--flange-top", type=float, default=29.0)
     ap.add_argument("--res", default="320x240")
     ap.add_argument("--dfov", type=float, default=120.0)
@@ -230,7 +236,7 @@ def main() -> None:
     ap.add_argument("--viz-every", type=int, default=0)
     args = ap.parse_args()
     w, h = (int(v) for v in args.res.split("x"))
-    rig = Rig(mode=args.mode, cam_up=args.up, cam_fwd=args.fwd, flange_top=args.flange_top,
+    rig = Rig(mode=args.mode, cam_y=args.cam_y, cam_z=args.cam_z, flange_top=args.flange_top, arm=not args.no_arm, lateral_mm=args.lateral,
               width=w, height=h, dfov_deg=args.dfov, lights=tuple(args.lights.split(",")))
     look = Look(ir_contrast=args.ir, noise_read=args.noise)
     tcfg = TrackerConfig(method=args.method, strips=args.strips)
