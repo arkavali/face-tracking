@@ -11,6 +11,9 @@ once the camera looks down at it steeper than ~45 deg, which is exactly the view
 camera mounted above the mirror holder gets. Brows are the main control input, so
 they get their own small camera and tracker.
 
+Results and recommendations: [docs/feasibility.md](docs/feasibility.md). Regenerate the
+full HTML report with `tools/report.py` (-> `out/report.html`).
+
 ## How the tracker works (`tools/tracker.py`)
 
 Seen from above, only the upper half of a brow faces the camera: the reliable feature

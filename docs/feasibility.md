@@ -15,11 +15,12 @@ Yes, with conditions that are mostly about where the camera and the LEDs go:
    follows raises and frowns on both brows; MediaPipe finds no face at all in those clips.
    On aligned frontal clips it matches MediaPipe with r 0.73-0.90 on 4 of 6 brows
    (failures: a lamp highlight on the forehead, a hand-held camera offset).
-3. In the **simulator** (8 actors, mask-camera view re-rendered from frontal video), the
-   result depends strongly on placement and lighting - see the table below. Best: an LED
-   below the mirror lighting the eye socket (the brow becomes a dark band between two lit
-   areas), a camera that does not see the holder's arm right under the brow, about 45 deg
-   above the brow at 5-6 cm. Worst: camera too close / too steep.
+3. In the **simulator** (8 actors, mask-camera view re-rendered from frontal video), the CAD
+   "red dot" placement tells a deliberate raise / lowering from rest in ~90% of single
+   frames (AUC 0.85 / 0.97). An extra LED below the mirror lighting the eye socket (the brow
+   becomes a dark band between two lit areas) is the best variant (raise AUC 0.99). Camera
+   positions too close / too steep are clearly worse; the other placements tried are within
+   the spread between people.
 4. The tracker is ported to C++ (`firmware/lib/brow_core`), matches the Python reference
    (double: 1e-10 px, float: <0.001 px on most brows) and needs ~0.1 ms per brow per
    frame on a PC; an ESP32 estimate is a few ms (measure with the `bench` command).
@@ -57,20 +58,56 @@ mixed clips it loses the face once the camera is more than ~45 deg above the fac
 
 ### Simulator
 
-SIM_TABLE_PLACEHOLDER
+8 RAVDESS actors x 60 clips (all emotions), 16 brows per config, OV2640-like 120 deg
+fisheye, 320x240 grey, IR-like texture, LED next to the lens unless stated. Holder =
+mirror frame 31.7 mm in front of the brow + diagonal arm to 14 mm (CAD sections).
 
-Metrics: r vs MediaPipe's brow contour projected into the simulated camera (same viewpoint),
-r vs MediaPipe brow height in the head frame, median over actors and both brows.
+| config | camera (above eye line / in front of brow skin) | r vs MP, camera view | r vs MP, head frame | raise vs rest: AUC / acc | lower vs rest: AUC / acc |
+|---|---|---|---|---|---|
+| **l_below**: + LED under the mirror | 57 / 39 mm | **0.86** | **0.77** | **0.99 / 97%** | 0.93 / 88% |
+| r_160: 160x120 frames | 57 / 39 | 0.79 | 0.76 | 0.84 / 90% | 0.97 / 91% |
+| l_noise6: 3x sensor noise | 57 / 39 | 0.78 | 0.73 | 0.90 / 94% | 0.95 / 87% |
+| **h_red**: the CAD "red dot" | 57 / 39 | 0.77 | 0.74 | 0.85 / 91% | 0.97 / 90% |
+| l_glasses: + glasses rim | 57 / 39 | 0.77 | 0.73 | 0.94 / 93% | 0.96 / 88% |
+| h_center_w: one camera, 150 deg | 57 / 39, centre | 0.76 | 0.74 | 0.96 / 93% | 0.88 / 76% |
+| l_ir05: weaker brow contrast in IR | 57 / 39 | 0.72 | 0.69 | 0.84 / 88% | 0.94 / 86% |
+| h_red_low10: holder 10 mm lower | 57 / 39 | 0.70 | 0.67 | 0.80 / 88% | 0.93 / 87% |
+| h_lateral: camera 10 mm towards the temple | 57 / 39 | 0.69 | 0.68 | 0.89 / 95% | 0.97 / 90% |
+| h_center: one camera, 120 deg | 57 / 39, centre | 0.69 | 0.66 | 0.92 / 91% | 0.89 / 80% |
+| h_red_edge: plain edge method | 57 / 39 | 0.67 | 0.69 | 0.87 / 89% | 0.95 / 89% |
+| h_close | 50 / 25 | 0.67 | 0.59 | 0.86 / 88% | 0.72 / 69% |
+| h_low10_close | 50 / 25, holder -10 | 0.65 | 0.60 | 0.89 / 88% | 0.75 / 69% |
+| h_steep | 70 / 30 | 0.57 | 0.45 | 0.80 / 81% | 0.72 / 65% |
+| h_vclose | 45 / 15 | 0.44 | 0.45 | 0.81 / 81% | 0.71 / 68% |
+
+Metrics: r vs MediaPipe's brow contour projected into the simulated camera (same viewpoint);
+r vs MediaPipe brow height in the head frame; median over 16 brows. Control columns: telling
+a raise (> +3 mm) or a lowering (< -2 mm) from rest (|h| < 1 mm) per frame without any
+smoothing - AUC and accuracy of a threshold halfway between the group medians
+(`tools/control_check.py`). MediaPipe itself is a noisy reference, so these are lower bounds.
+
+Readings:
+- The differences between the red dot, a central camera and a temple-side camera are within
+  the spread between people (2 actors looked very different from 8 - small samples mislead).
+- Robust effects: the extra LED below the mirror helps everything (raise detection 0.99 AUC);
+  too close / too steep placements lose the lowering direction (AUC ~0.72) because the brow
+  is seen edge-on and slides under the brow ridge.
+- 160x120 frames are as good as 320x240 (the brow is a large, soft structure).
+- Glasses (thin rim below the brow) and 3x noise do not hurt; weaker IR contrast costs a little.
+- The holder's diagonal arm under the outer brow end is the main source of outer-end errors
+  (the tracker strips can stick to its sharp edge); keep it out of the brow ROI if possible.
+- Frown proxy (inner end lowering vs MediaPipe browDown): r ~0.4 for most placements,
+  0.58 with the LED below; a dedicated frown channel is still to do.
 
 ## Recommendations for the mask
 
 - **LEDs**: add (or share with a future pupil camera) a diffused IR LED below the mirror
   that lights the eye socket and the lower brow, plus one near the brow camera. Keep LEDs
   out of direct view of the eye (diffuser / baffle), low current.
-- **Camera**: above the mirror holder, ~45 deg above the brow, 5-6 cm away; avoid placing
-  it so the holder's arm or frame edge appears right under the brow in the image (shift it
-  towards the temple, or use one central camera above the nose bridge for both brows).
-  Too close / too steep (lens next to the holder tip) does not work: the brow is seen edge-on.
+- **Camera**: the planned spot above the mirror holder (~45 deg above the brow, 5-6 cm away)
+  is fine; one central wide camera for both brows works about as well. Do not move it closer
+  or steeper (lens next to the holder tip): the brow is seen edge-on and lowering is lost.
+  If possible keep the holder's arm out of the image area right under the brow.
 - **Lens**: the 120 deg OV2640 is enough; 320x240 or even 160x120 grey frames suffice.
 - **ROI**: drawn once per brow, from below the hairline to below the brow, with ~12 mm of
   room above the brow for a full raise.

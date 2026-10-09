@@ -20,6 +20,25 @@ COLS = [
 ]
 
 
+def control_scores(cdir) -> list:
+    """Median AUC / threshold accuracy for raise-vs-rest and lower-vs-rest (control_check.py)."""
+    import numpy as np
+
+    from control_check import LOWER_MM, RAISE_MM, REST_MM, auc, thr_acc
+
+    ua, uc, da, dc = [], [], [], []
+    for f in sorted(cdir.glob("actor_*.npz")):
+        d = np.load(f)
+        for s in "RL":
+            mp, tr = d[f"{s}_mp"], d[f"{s}_raise"]
+            rest, up, dn = tr[np.abs(mp) < REST_MM], tr[mp > RAISE_MM], tr[mp < -LOWER_MM]
+            ua.append(auc(up, rest))
+            uc.append(thr_acc(up, rest))
+            da.append(auc(-dn, -rest))
+            dc.append(thr_acc(-dn, -rest))
+    return [float(np.nanmedian(v)) if np.isfinite(v).any() else float("nan") for v in (ua, uc, da, dc)]
+
+
 def describe(cfg: dict) -> str:
     r, lk, t = cfg["rig"], cfg["look"], cfg["tracker"]
     cam = (f"cam y{r['cam_y']:.0f}/z{r['cam_z']:.0f} mm" if "cam_y" in r
@@ -52,6 +71,7 @@ def main() -> None:
         desc = describe(cfg) if cfg else ""
         n_act = len(d["per_actor"])
         cells = "".join(f"<td>{fmt.format(d['median'][k])}</td>" for k, _, fmt in COLS)
+        cells += "".join(f"<td>{v:.2f}</td>" for v in control_scores(cdir))
         rows.append(f"<tr><td><a href='#{name}'>{html.escape(name)}</a></td><td>{n_act}</td>{cells}"
                     f"<td class='desc'>{html.escape(desc)}</td></tr>")
         imgs = "".join(f"<img src='eval/{name}/{p.name}' loading='lazy'>" for p in sorted(cdir.glob("plot_*.png")))
@@ -108,7 +128,10 @@ h2 {{ margin-top:32px; }}
 <h1>Brow tracker - simulated mask camera vs MediaPipe</h1>
 <p>Medians over actors and both brows. "MP" = MediaPipe FaceLandmarker on the original frontal video (the teacher).
 Positive raise = brow up. See tools/metrics.py for definitions.</p>
-<table><tr><th>config</th><th>actors</th>{head}<th>setup</th></tr>{''.join(rows)}</table>
+<p>Control columns: AUC and threshold accuracy for telling a raise (&gt;+3 mm) or a lowering
+(&lt;-2 mm) from rest (|h| &lt; 1 mm), per frame, no smoothing (tools/control_check.py).</p>
+<table><tr><th>config</th><th>actors</th>{head}<th>AUC up</th><th>acc up</th><th>AUC down</th><th>acc down</th>
+<th>setup</th></tr>{''.join(rows)}</table>
 {''.join(sections)}
 </body></html>"""
     (OUT / "report.html").write_text(page, encoding="utf-8")
