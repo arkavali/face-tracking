@@ -12,6 +12,8 @@
 //   exp auto|N              exposure: automatic, or fixed N lines with auto gain
 //   reg ADDR [VALUE]        read / write a camera register (hex, debugging)
 //   status                  frame rate, memory, model state
+//   box N [M]               pupil seed box in px (16 behind the AR mirror, 8 from below;
+//                           M = optional second box, 0 = off)
 //   reset                   forget the eye model (re-learns while you look around)
 // Output line:
 //   EYE seq=.. ms=.. p=0|1 [cx= cy= a= b= ang= con= top=] [ex= ey= R=] [gx= gy= gz=] [g1x= g1y= g2x= g2y=]
@@ -153,7 +155,7 @@ void handleCommand(String cmd) {
   sscanf(cmd.c_str(), "%15s", word);
   String w(word);
   if (w == "help") {
-    Serial.println("stream on|off | snap | preview off|1|2|4 | bench | exp auto|N | reg ADDR [VALUE] | status | reset");
+    Serial.println("stream on|off | snap | preview off|1|2|4 | bench | box N [M] | exp auto|N | reg ADDR [VALUE] | status | reset");
   } else if (w == "stream") {
     streaming = cmd.indexOf("on") > 0;
     Serial.printf("OK stream %s\n", streaming ? "on" : "off");
@@ -177,7 +179,10 @@ void handleCommand(String cmd) {
     int found = 0;
     uint32_t t0 = micros();
     for (int k = 0; k < 20; ++k) found += det->detect(fb->buf, &e);
-    Serial.printf("bench: %.2f ms per detect (pupil found %d/20)\n", (micros() - t0) / 20000.0f, found);
+    Serial.printf("bench: %.2f ms per detect (pupil found %d/20); last: blur %u seed %u starburst %u ransac %u "
+                  "checks %u us\n",
+                  (micros() - t0) / 20000.0f, found, (unsigned)det->prof_us[0], (unsigned)det->prof_us[1],
+                  (unsigned)det->prof_us[2], (unsigned)det->prof_us[3], (unsigned)det->prof_us[4]);
     esp_camera_fb_return(fb);
   } else if (w == "preview") {
     int s = 0;
@@ -211,6 +216,15 @@ void handleCommand(String cmd) {
     }
     if (n == 2) sen->set_reg(sen, addr, 0xff, value);
     Serial.printf("reg 0x%03x = 0x%02x\n", addr, sen->get_reg(sen, addr, 0xff));
+  } else if (w == "box") {
+    int b = 0, b2 = 0;
+    if (sscanf(cmd.c_str(), "box %d %d", &b, &b2) < 1 || b < 4 || b > 16 || (b2 && (b2 < 4 || b2 > 16))) {
+      Serial.println("ERR usage: box N [M] (4..16, M 0 = off)");
+      return;
+    }
+    detector->params().box = b;
+    detector->params().box2 = b2;
+    Serial.printf("OK box %d %d\n", b, b2);
   } else if (w == "status") {
     printStatus();
   } else if (w == "reset") {

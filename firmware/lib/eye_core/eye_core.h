@@ -1,7 +1,8 @@
 // Eye tracker core: C++ port of tools/pupil.py and tools/eyemodel.py, no Arduino
 // dependencies.
 //
-// PupilDetector: 3x3 box blur x2 (integer, separable), darkest box seed on a 2x-downsampled frame, starburst
+// PupilDetector: darkest box seed on the raw frame, 3x3 box blur x2 (integer, separable,
+// only in a window around the seed) on a 2x-downsampled frame, starburst
 // rays (glint skip, sub-pixel step), RANSAC over 5-point subsets with the Fitzgibbon
 // direct ellipse fit, refit on inliers, dark-inside / ring-contrast / upper-lid checks.
 // PupilGate: rejects weak pupils against the running median contrast.
@@ -30,7 +31,10 @@ constexpr int kGateHist = 100;
 constexpr int kMaxGlints = 4;
 
 struct Params {
-  int box = 8;              // seed box (px at full resolution), ~ min pupil diameter
+  // Seed box (px at full resolution), per camera placement: 16 behind the AR mirror,
+  // 8 from below (see PupilParams in tools/pupil.py).
+  int box = 16;
+  int box2 = 0;             // optional second seed box, both followed (0 = off)
   int rays = 36;
   real r_min = 2;
   real r_max = 45;          // px
@@ -75,27 +79,33 @@ class XorShift32 {
 
 class PupilDetector {
  public:
-  // work: w*h uint16 of scratch memory kept by the caller (internal RAM on the ESP32 if it
-  // fits: ~150 KB at 320x240; PSRAM works but the blur gets slower).
+  // work: scratch for the blurred window, (2 * (r_max + 12))^2 uint16 (~22 KB with the
+  // defaults; w*h always suffices), kept by the caller, internal RAM preferred.
   PupilDetector(uint16_t* work, int w, int h, const Params& p = Params(), uint32_t seed = 0);
   ~PupilDetector();
   // true and *out filled when a pupil is found.
   bool detect(const uint8_t* img, Ellipse* out);
-  // Blurred frame x 81 (two 3x3 box passes, integer sums).
-  const uint16_t* blurred81() const { return buf_; }
   const Params& params() const { return p_; }
+  Params& params() { return p_; }
   // Microseconds spent in blur, seed, starburst, ransac, checks during the last detect()
   // (filled only when built with EYE_PROFILE).
   uint32_t prof_us[5] = {0, 0, 0, 0, 0};
 
  private:
-  void blur(const uint8_t* img);
-  void seed(real* sx, real* sy, real* level);
+  void blurWindow(int cx, int cy, int half);
+  void seed(int box, real* sx, real* sy, real* level);
+  bool detectFrom(real sx, real sy, real level, Ellipse* out);
+  uint16_t blurPx(int x, int y) const;
+  uint16_t px81(int x, int y) const {  // blurred x 81: from the window if inside, else computed
+    return (x >= wx0_ && x < wx1_ && y >= wy0_ && y < wy1_) ? buf_[(y - wy0_) * ww_ + (x - wx0_)] : blurPx(x, y);
+  }
   int starburst(real sx, real sy, real level, real* px, real* py);
   real at(real x, real y) const;  // bilinear on the blurred frame, clamped
 
-  uint16_t* buf_;
-  uint16_t* rows_ = nullptr;  // 5 horizontally filtered rows (ring)
+  const uint8_t* img_ = nullptr;
+  uint16_t* buf_;             // blurred window x 81
+  uint16_t* rows_ = nullptr;  // 5 horizontally filtered rows of the window (ring)
+  int wx0_ = 0, wx1_ = 0, wy0_ = 0, wy1_ = 0, ww_ = 0;
   int w_, h_;
   Params p_;
   XorShift32 rng_;

@@ -253,44 +253,61 @@ namespace {
 
 inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-// Two edge-padded 3-tap box passes along one axis, as integer sums (x 9):
-// out[q] = sum_{i,j in -1..1} in[clamp(clamp(q + i) + j)]; interior weights 1 2 3 2 1.
-inline void hfilter2(const uint8_t* in, uint16_t* out, int w) {
-  for (int x = 2; x < w - 2; ++x)
-    out[x] = uint16_t(in[x - 2] + 2 * in[x - 1] + 3 * in[x] + 2 * in[x + 1] + in[x + 2]);
-  const int edge[4] = {0, 1, w - 2, w - 1};
-  for (int x : edge) {
-    int s = 0;
-    for (int i = -1; i <= 1; ++i)
-      for (int j = -1; j <= 1; ++j) s += in[clampi(clampi(x + i, 0, w - 1) + j, 0, w - 1)];
-    out[x] = uint16_t(s);
-  }
+// Two edge-padded 3-tap box passes along a row at x, as an integer sum (x 9):
+// sum_{i,j in -1..1} in[clamp(clamp(x + i) + j)]; interior weights 1 2 3 2 1.
+inline int filt2(const uint8_t* in, int x, int n) {
+  if (x >= 2 && x < n - 2) return in[x - 2] + 2 * in[x - 1] + 3 * in[x] + 2 * in[x + 1] + in[x + 2];
+  int s = 0;
+  for (int i = -1; i <= 1; ++i)
+    for (int j = -1; j <= 1; ++j) s += in[clampi(clampi(x + i, 0, n - 1) + j, 0, n - 1)];
+  return s;
 }
 
 }  // namespace
 
-void PupilDetector::blur(const uint8_t* img) {
-  // Same result as the Python reference (vertical then horizontal 3x3 box, twice, with
-  // edge padding): the passes are separable and commute, so each row is filtered
-  // horizontally once (ring of 5 rows) and the vertical double pass sums 9 row indices.
-  const int w = w_, h = h_;
-  auto row = [&](int r) { return rows_ + (r % 5) * w; };
+// Blurred value x 81 at an integer pixel, straight from the raw frame (25 reads inside,
+// 81 at the frame border). Equal to the full-frame two-pass blur of the Python reference.
+uint16_t PupilDetector::blurPx(int x, int y) const {
+  int s = 0;
+  if (y >= 2 && y < h_ - 2) {
+    const int wy[5] = {1, 2, 3, 2, 1};
+    for (int k = 0; k < 5; ++k) s += wy[k] * filt2(img_ + (y - 2 + k) * w_, x, w_);
+  } else {
+    for (int i = -1; i <= 1; ++i)
+      for (int j = -1; j <= 1; ++j) s += filt2(img_ + clampi(clampi(y + i, 0, h_ - 1) + j, 0, h_ - 1) * w_, x, w_);
+  }
+  return uint16_t(s);
+}
+
+void PupilDetector::blurWindow(int cx, int cy, int half) {
+  // The window [wx0, wx1) x [wy0, wy1) is filtered row by row: each source row once
+  // horizontally (ring of 5 rows), then the vertical double pass over 9 clamped row indices.
+  wx0_ = clampi(cx - half, 0, w_);
+  wx1_ = clampi(cx + half, 0, w_);
+  wy0_ = clampi(cy - half, 0, h_);
+  wy1_ = clampi(cy + half, 0, h_);
+  ww_ = wx1_ - wx0_;
+  const int ww = ww_;
+  auto row = [&](int r) { return rows_ + (r % 5) * ww; };
   int have = -1;  // last filtered source row
-  for (int y = 0; y < h; ++y) {
-    const int need = y + 2 < h ? y + 2 : h - 1;
+  for (int y = wy0_; y < wy1_; ++y) {
+    const int lo = clampi(y - 2, 0, h_ - 1), need = clampi(y + 2, 0, h_ - 1);
+    if (have < lo - 1) have = lo - 1;
     while (have < need) {
       ++have;
-      hfilter2(img + have * w, row(have), w);
+      const uint8_t* in = img_ + have * w_;
+      uint16_t* o = row(have);
+      for (int x = wx0_; x < wx1_; ++x) o[x - wx0_] = uint16_t(filt2(in, x, w_));
     }
-    uint16_t* o = buf_ + y * w;
-    if (y >= 2 && y < h - 2) {
+    uint16_t* o = buf_ + (y - wy0_) * ww;
+    if (y >= 2 && y < h_ - 2) {
       const uint16_t *a = row(y - 2), *b = row(y - 1), *c = row(y), *d = row(y + 1), *e = row(y + 2);
-      for (int x = 0; x < w; ++x) o[x] = uint16_t(a[x] + 2 * b[x] + 3 * c[x] + 2 * d[x] + e[x]);  // x 81, max 20655
+      for (int x = 0; x < ww; ++x) o[x] = uint16_t(a[x] + 2 * b[x] + 3 * c[x] + 2 * d[x] + e[x]);  // x 81
     } else {
       int idx[9], k = 0;
       for (int i = -1; i <= 1; ++i)
-        for (int j = -1; j <= 1; ++j) idx[k++] = clampi(clampi(y + i, 0, h - 1) + j, 0, h - 1);
-      for (int x = 0; x < w; ++x) {
+        for (int j = -1; j <= 1; ++j) idx[k++] = clampi(clampi(y + i, 0, h_ - 1) + j, 0, h_ - 1);
+      for (int x = 0; x < ww; ++x) {
         int s = 0;
         for (int q = 0; q < 9; ++q) s += row(idx[q])[x];
         o[x] = uint16_t(s);
@@ -299,35 +316,30 @@ void PupilDetector::blur(const uint8_t* img) {
   }
 }
 
-void PupilDetector::seed(real* sx, real* sy, real* level) {
-  // Darkest k x k box on the 2x-downsampled frame (values clipped at 120 grey levels so a
-  // glint does not lift a pupil's mean), border of 3 cells ignored. Running column sums.
+void PupilDetector::seed(int box, real* sx, real* sy, real* level) {
+  // Darkest k x k box on the 2x-downsampled raw frame (cells clipped at 120 grey levels so
+  // a glint does not lift a pupil's mean), border of 3 cells ignored. Running column sums.
   const int hw = w_ / 2, hh = h_ / 2;
-  const int k = p_.box / 2 > 2 ? p_.box / 2 : 2;
+  int k = box / 2 > 2 ? box / 2 : 2;
+  if (k > 8) k = 8;
   const int bd = 3;
   const int mh = hh + 1 - k, mw = hw + 1 - k;
-  const int clip = 120 * 81 * 4;
+  const int clip = 120 * 4;
   static int32_t col[512];
-  static int32_t cells[512];
+  static int16_t ring[8][512];  // the last k rows of cells (k <= 8): each raw pixel read once
   for (int x = 0; x < hw; ++x) col[x] = 0;
   int64_t best = INT64_MAX;
   int bx = 0, by = 0;
   for (int y = 0; y < hh; ++y) {
-    const uint16_t* r0 = buf_ + (2 * y) * w_;
-    const uint16_t* r1 = r0 + w_;
+    int16_t* cur = ring[y % k];
+    const uint8_t* r0 = img_ + (2 * y) * w_;
+    const uint8_t* r1 = r0 + w_;
     for (int x = 0; x < hw; ++x) {
       int v = r0[2 * x] + r0[2 * x + 1] + r1[2 * x] + r1[2 * x + 1];
       if (v > clip) v = clip;
-      cells[x] = v;
+      if (y >= k) col[x] -= cur[x];  // the cell row k rows up leaves the window
+      cur[x] = int16_t(v);
       col[x] += v;
-    }
-    if (y >= k) {  // drop the row that left the window
-      const uint16_t* q0 = buf_ + (2 * (y - k)) * w_;
-      const uint16_t* q1 = q0 + w_;
-      for (int x = 0; x < hw; ++x) {
-        int v = q0[2 * x] + q0[2 * x + 1] + q1[2 * x] + q1[2 * x + 1];
-        col[x] -= v > clip ? clip : v;
-      }
     }
     const int top = y - k + 1;  // window rows top..y
     if (top < bd || top >= mh - bd) continue;
@@ -344,7 +356,7 @@ void PupilDetector::seed(real* sx, real* sy, real* level) {
   }
   *sx = real(2 * bx + k);
   *sy = real(2 * by + k);
-  *level = real(best) / real(k * k * 4 * 81);
+  *level = real(best) / real(k * k * 4);
 }
 
 real PupilDetector::at(real x, real y) const {
@@ -352,10 +364,21 @@ real PupilDetector::at(real x, real y) const {
   y = clampv(y, real(0), real(h_ - 1.001));
   int x0 = int(x), y0 = int(y);
   real fx = x - x0, fy = y - y0;
-  const uint16_t* r0 = buf_ + y0 * w_ + x0;
-  const uint16_t* r1 = r0 + w_;
-  real a = r0[0] * (1 - fx) + r0[1] * fx;
-  real b = r1[0] * (1 - fx) + r1[1] * fx;
+  real v00, v01, v10, v11;
+  if (x0 >= wx0_ && x0 + 1 < wx1_ && y0 >= wy0_ && y0 + 1 < wy1_) {
+    const uint16_t* r0 = buf_ + (y0 - wy0_) * ww_ + (x0 - wx0_);
+    v00 = r0[0];
+    v01 = r0[1];
+    v10 = r0[ww_];
+    v11 = r0[ww_ + 1];
+  } else {
+    v00 = px81(x0, y0);
+    v01 = px81(x0 + 1, y0);
+    v10 = px81(x0, y0 + 1);
+    v11 = px81(x0 + 1, y0 + 1);
+  }
+  real a = v00 * (1 - fx) + v01 * fx;
+  real b = v10 * (1 - fx) + v11 * fx;
   return (a * (1 - fy) + b * fy) * real(1.0 / 81);
 }
 
@@ -415,13 +438,40 @@ int PupilDetector::starburst(real sx, real sy, real level, real* px, real* py) {
 bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
   uint32_t t0 = EYE_T();
   for (uint32_t& v : prof_us) v = 0;
-  blur(img);
+  img_ = img;
+  // Two seeds: the darkest small box (sharp, clean frames) and the darkest large box (noisy
+  // frames, where small dark specks win). Both are followed through; the ellipse with the
+  // higher support x ring contrast wins.
+  real sx[2], sy[2], level[2];
+  seed(p_.box, &sx[0], &sy[0], &level[0]);
+  int ns = 1;
+  if (p_.box2) {
+    seed(p_.box2, &sx[1], &sy[1], &level[1]);
+    if (sqrt((sx[1] - sx[0]) * (sx[1] - sx[0]) + (sy[1] - sy[0]) * (sy[1] - sy[0])) >= p_.box2 / real(2)) ns = 2;
+  }
+  prof_us[1] = EYE_T() - t0;
+  bool found = false;
+  real bestScore = 0;
+  for (int i = 0; i < ns; ++i) {
+    Ellipse e;
+    if (!detectFrom(sx[i], sy[i], level[i], &e)) continue;
+    real score = e.support * (e.contrast > 0 ? e.contrast : 0);
+    if (!found || score > bestScore) {
+      *out = e;
+      bestScore = score;
+      found = true;
+    }
+  }
+  return found;
+}
+
+bool PupilDetector::detectFrom(real sx, real sy, real level, Ellipse* out) {
   uint32_t t1 = EYE_T();
-  prof_us[0] = t1 - t0;
-  real sx, sy, level;
-  seed(&sx, &sy, &level);
+  // Window big enough for the rays (r_max) around the seed; anything outside it (the seed
+  // moved, a big pupil's ring at 1.6 a) is computed per pixel by px81().
+  blurWindow(int(sx), int(sy), int(p_.r_max) + 12);
   uint32_t t2 = EYE_T();
-  prof_us[1] = t2 - t1;
+  prof_us[0] += t2 - t1;
   real px[kMaxRays], py[kMaxRays], scratch[kMaxRays];
   int n = 0;
   for (int round = 0; round < p_.rounds; ++round) {
@@ -434,7 +484,7 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
     if (done) break;
   }
   uint32_t t3 = EYE_T();
-  prof_us[2] = t3 - t2;
+  prof_us[2] += t3 - t2;
   // RANSAC
   bool have = false;
   real best[5] = {0, 0, 0, 0, 0};
@@ -482,7 +532,7 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
   if (!(fitEllipse(ix, iy, ni, conic) && conicToParams(conic, &prm[0], &prm[1], &prm[2], &prm[3], &prm[4])))
     memcpy(prm, best, sizeof(prm));
   uint32_t t4 = EYE_T();
-  prof_us[3] = t4 - t3;
+  prof_us[3] += t4 - t3;
   real cx = prm[0], cy = prm[1], a = prm[2], b = prm[3], ang = prm[4];
   if (a > p_.r_max * real(1.2) || ni < p_.min_support * p_.rays) return false;
   // dark inside
@@ -494,7 +544,7 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
     int c = 0;
     for (int y = y0; y <= y1 && y < h_; ++y)
       for (int x = x0; x <= x1 && x < w_; ++x) {
-        s += buf_[y * w_ + x];  // x 81
+        s += px81(x, y);
         ++c;
       }
     if (c == 0 || real(s) / (real(c) * 81) - level > p_.max_inside) return false;
@@ -530,7 +580,7 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
   out->n = ni;
   out->contrast = contrast;
   out->top_vis = top;
-  prof_us[4] = EYE_T() - t4;
+  prof_us[4] += EYE_T() - t4;
   return true;
 }
 
@@ -556,7 +606,8 @@ bool PupilGate::operator()(const Ellipse* e) {
 
 int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, int level, real reach,
                real isolate) {
-  const int r = int(reach * e.a) + 2;
+  int r = int(reach * e.a) + 2;
+  if (r > 77) r = 77;  // search box <= 155 x 155 px (fits seen[])
   int x0 = int(e.cx) - r, x1 = int(e.cx) + r + 1, y0 = int(e.cy) - r, y1 = int(e.cy) + r + 1;
   if (x0 < 0) x0 = 0;
   if (y0 < 0) y0 = 0;
@@ -564,7 +615,7 @@ int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, i
   if (y1 > h) y1 = h;
   const int bw = x1 - x0, bh = y1 - y0;
   if (bw <= 0 || bh <= 0) return 0;
-  static uint8_t seen[256 * 256];  // box up to 256 x 256 px (reach * a <= ~126 px)
+  static uint8_t seen[160 * 160];
   if (bw * bh > int(sizeof(seen))) return 0;
   memset(seen, 0, bw * bh);
   constexpr int kMaxFound = 32;

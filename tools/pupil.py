@@ -20,7 +20,11 @@ import numpy as np
 
 @dataclass
 class PupilParams:
-    box: int = 8                  # seed box (px at full resolution), ~ min pupil diameter
+    # Seed box (px at full resolution). Set per camera placement: 16 for the camera behind
+    # the AR mirror (noisy frames: small boxes lock onto dark specks), 8 from below (clean
+    # frames, dark lid shading wins at large scales). Simulation, 2026-10-10.
+    box: int = 16
+    box2: int = 0                 # optional second seed box, both followed (0 = off)
     rays: int = 36
     r_min: float = 2.0
     r_max: float = 45.0           # px
@@ -55,13 +59,14 @@ class Ellipse:
 
 
 def darkest_seed(img: np.ndarray, box: int):
-    """Centre (x, y) and mean of the darkest box, searched on a 2x-downsampled frame."""
+    """Centre (x, y) and mean of the darkest box, searched on the 2x-downsampled raw frame
+    (the box average already smooths; the blur is only needed around the pupil)."""
     h, w = img.shape
     s = img[: h // 2 * 2, : w // 2 * 2].astype(np.float64)
     s = (s[0::2, 0::2] + s[1::2, 0::2] + s[0::2, 1::2] + s[1::2, 1::2]) / 4
     # glints would pull a box mean up; clip bright pixels to keep a pupil with a glint dark
     s = np.minimum(s, 120)
-    k = max(box // 2, 2)
+    k = min(max(box // 2, 2), 8)     # the C++ port keeps at most 8 cell rows
     ii = np.pad(s.cumsum(0).cumsum(1), ((1, 0), (1, 0)))
     m = (ii[k:, k:] - ii[:-k, k:] - ii[k:, :-k] + ii[:-k, :-k]) / (k * k)
     # ignore a border of the frame (vignetting, mask edge)
@@ -84,15 +89,15 @@ def _bilinear(img, x, y):
     return a * (1 - fy) + b * fy
 
 
-def starburst(img: np.ndarray, seed, level: float, p: PupilParams):
-    """Edge points around the seed (N, 2)."""
+def starburst(img: np.ndarray, seed, level: float, p: PupilParams, scale: float = 1.0):
+    """Edge points around the seed (N, 2). img * scale = grey levels."""
     h, w = img.shape
     th = np.linspace(0, 2 * np.pi, p.rays, endpoint=False)
     r = np.arange(p.r_min, p.r_max, p.step)
     xs = seed[0] + np.cos(th)[:, None] * r[None]
     ys = seed[1] + np.sin(th)[:, None] * r[None]
     inside = (xs >= 0) & (xs < w - 1) & (ys >= 0) & (ys < h - 1)
-    prof = _bilinear(img.astype(np.float64), xs, ys)
+    prof = _bilinear(img.astype(np.float64), xs, ys) * scale
     pts = []
     for i in range(p.rays):
         v = prof[i]
@@ -240,18 +245,38 @@ class PupilDetector:
 
     def detect(self, img: np.ndarray) -> Ellipse | None:
         p = self.p
-        # 3x3 box blur twice (cheap, separable): tames sensor noise before the ray search
-        img = img.astype(np.float64)
+        raw = img
+        # 3x3 box blur twice (separable), kept as integer sums (x 81) and scaled after the
+        # bilinear sampling, in the same order as the C++ port (which blurs only a window
+        # around the seed): borderline threshold tests then agree exactly.
+        img = img.astype(np.int64)
         for _ in range(2):
             img = (np.pad(img, ((1, 1), (0, 0)), mode="edge")[:-2] + img
-                   + np.pad(img, ((1, 1), (0, 0)), mode="edge")[2:]) / 3
+                   + np.pad(img, ((1, 1), (0, 0)), mode="edge")[2:])
             img = (np.pad(img, ((0, 0), (1, 1)), mode="edge")[:, :-2] + img
-                   + np.pad(img, ((0, 0), (1, 1)), mode="edge")[:, 2:]) / 3
-        (sx, sy), level = darkest_seed(img, p.box)
-        seed = (float(sx), float(sy))
+                   + np.pad(img, ((0, 0), (1, 1)), mode="edge")[:, 2:])
+        k81 = 1.0 / 81
+        # Two seeds: the darkest small box (sharp, clean frames) and the darkest large box
+        # (noisy frames, where small dark specks win). Both are followed through; the
+        # ellipse with the higher support x ring contrast wins.
+        seeds = [darkest_seed(raw, p.box)]
+        if p.box2:
+            s2 = darkest_seed(raw, p.box2)
+            if np.hypot(s2[0][0] - seeds[0][0][0], s2[0][1] - seeds[0][0][1]) >= p.box2 / 2:
+                seeds.append(s2)
+        best = None
+        for (sx, sy), level in seeds:
+            e = self._from_seed(img, (float(sx), float(sy)), level, k81)
+            if e is not None and (best is None or e.support * max(e.contrast, 0.0) >
+                                  best.support * max(best.contrast, 0.0)):
+                best = e
+        return best
+
+    def _from_seed(self, img, seed, level, k81) -> Ellipse | None:
+        p = self.p
         pts = np.zeros((0, 2))
         for _ in range(p.rounds):
-            pts = starburst(img, seed, level, p)
+            pts = starburst(img, seed, level, p, k81)
             if len(pts) < p.min_points:
                 return None
             new = tuple(np.median(pts, 0))
@@ -268,13 +293,13 @@ class PupilDetector:
         # the inside must be dark: rejects closed-lid / lash fits
         yy, xx = np.mgrid[max(int(cy - b), 0):int(cy + b) + 1, max(int(cx - b), 0):int(cx + b) + 1]
         ok = (xx < img.shape[1]) & (yy < img.shape[0])
-        if not ok.any() or img[yy[ok], xx[ok]].mean() - level > p.max_inside:
+        if not ok.any() or float(img[yy[ok], xx[ok]].sum()) / (ok.sum() * 81) - level > p.max_inside:
             return None
         # ring just outside the pupil (iris): a real pupil is much darker than its ring
         t = np.linspace(0, 2 * np.pi, 16, endpoint=False)
         ca, sa = np.cos(ang), np.sin(ang)
         u, v = 1.6 * a * np.cos(t), 1.6 * b * np.sin(t)
-        ring = _bilinear(img, cx + u * ca - v * sa, cy + u * sa + v * ca)
+        ring = _bilinear(img.astype(np.float64), cx + u * ca - v * sa, cy + u * sa + v * ca) * k81
         # upper lid over the pupil: along rays pointing up (+-35 deg), edge distance from the
         # centre relative to the ellipse's own extent in that direction
         d = pts - [cx, cy]
@@ -298,7 +323,7 @@ def find_glints(img: np.ndarray, e: Ellipse, level: int = 230, reach: float = 3.
     bounding box (2 px out) must be at least `isolate` grey levels below `level`. Bright
     sclera / skin noise peaks fail that test."""
     h, w = img.shape
-    r = int(reach * e.a) + 2
+    r = min(int(reach * e.a) + 2, 77)    # search box <= 155 x 155 px (the C++ buffer)
     x0, x1 = max(int(e.cx) - r, 0), min(int(e.cx) + r + 1, w)
     y0, y1 = max(int(e.cy) - r, 0), min(int(e.cy) + r + 1, h)
     m = img[y0:y1, x0:x1] >= level

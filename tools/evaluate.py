@@ -5,6 +5,7 @@ python evaluate.py [names ...]   (reads out/seq/<name>.npz, writes out/eval/<nam
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -12,11 +13,11 @@ from pathlib import Path
 import numpy as np
 
 from eyemodel import Calib, EyeModel, yaw_pitch
-from pupil import GlintPairer, PupilDetector, PupilGate, find_glints
+from pupil import GlintPairer, PupilDetector, PupilGate, PupilParams, find_glints
 
 ROOT = Path(__file__).resolve().parent.parent
 SEQ = ROOT / "out" / "seq"
-EVAL = ROOT / "out" / "eval"
+EVAL = ROOT / "out" / os.environ.get("EYE_EVAL_DIR", "eval")
 
 
 def ang_err(y1, p1, y2, p2):
@@ -32,7 +33,8 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
     imgs, gts = d["imgs"], json.loads(str(d["gt"]))
     camR, f = d["cam_R"], float(d["f"])
     h, w = imgs.shape[1:]
-    det = PupilDetector()
+    box = 8 if name.startswith("under") else 16      # per placement, see PupilParams
+    det = PupilDetector(PupilParams(box=int(os.environ.get("EYE_BOX", box)), box2=int(os.environ.get("EYE_BOX2", 0))))
     gate = PupilGate()
     pairer = GlintPairer()
     model = EyeModel(f, w, h)

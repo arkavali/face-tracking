@@ -31,13 +31,20 @@ Freenove / ESP32-S3-EYE layout and must be checked against the boards. Gaze cali
 (AR target points, glint mapping, blink ranges) is meant to run on the hub from the raw
 values.
 
-Measured on a real ESP32-S3 N16R8 (the hub test board, camera-less bench env `s3bench`,
-frames sent from the PC by `tools/hw_bench.py`, 2026-10-10): detect + gate + model + glints
-**26.7 ms per 320x240 frame** (blur 12, seed 4.5, starburst 2.8, RANSAC 5.4 ms), results
-equal to the host float build (1 borderline frame of 200 differs). The first port took
-163 ms (float blur in PSRAM, double-precision ellipse fit); the blur is now integer and
-separable with its buffer in internal RAM, and the fit uses float. Further headroom if
-needed: seed on the raw downsampled frame and blur only a window around the pupil.
+Measured on real boards (2026-10-10):
+- ESP32-S3 N16R8 (hub test board, camera-less env `s3bench`, frames from the PC via
+  `tools/hw_bench.py`): detect + gate + model + glints **18.5 ms per 320x240 frame**
+  (seed 4.6, blur 3.1, starburst 3.0, RANSAC 5.6 ms); output identical to the Python
+  reference. The first port took 163 ms (float full-frame blur in PSRAM, double-precision
+  fit); now the seed runs on the raw frame, the blur is integer and only in a window
+  around the seed (pixels outside it are computed on demand, same values), the fit is float.
+- The brow tracker's AI-Thinker ESP32-CAM (env `esp32cam`, its real OV2640): camera at
+  25 fps with tracking, 18 ms per frame when no pupil is in view (seed 9 ms: the classic
+  ESP32 reads PSRAM slower). Its brow firmware: `../_backups/esp32cam_brow_COM3_2026-10-10.bin`
+  or `../brow_tracker/flash_firmware.bat`.
+
+The pupil seed box is a per-placement setting (`box` command): 16 px behind the AR
+mirror (noisy frames), 8 px from below.
 
 ## Tools (`tools/`)
 
