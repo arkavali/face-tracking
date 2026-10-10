@@ -51,6 +51,7 @@ mirror (noisy frames), 8 px from below.
 | Script | What it does |
 |---|---|
 | `eyesim.py` | Ray-traced near-IR eye: refracting cornea, iris/pupil, lids that follow the gaze, blink/squint, lashes, LED glints, AR screen reflection, semi-transparent combiner plate, glasses (lens power, surface reflections, rim), sensor noise |
+| `sweep.py` | Camera placement sweep (distance x height x side): render, evaluate, heat maps (`out/sweep/`) |
 | `led_glasses.py` | Where LED reflections in a spectacle lens land, per LED position |
 | `placements.py` | Camera/LED placements for one eye (under the AR mirror at several distances, through the combiner) |
 | `preview.py` | Contact sheet: placements x eye states (`out/preview.png`) |

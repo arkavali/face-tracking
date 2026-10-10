@@ -1,0 +1,54 @@
+d 30 e -50 a   0 box  8  det 0.95 sq 0.98 blink 0.94/0.05  pupil 3.6  glint  8.5/ 3.7
+d 45 e -50 a   0 box  8  det 0.98 sq 1.00 blink 0.11/0.02  pupil 4.3  glint   - /  - 
+d 65 e -50 a   0 box  8  det 0.91 sq 0.45 blink 0.78/0.09  pupil 5.4  glint   - /  - 
+d 30 e -35 a   0 box 16  det 0.86 sq 0.98 blink 0.78/0.14  pupil 2.7  glint  9.0/15.7
+d 45 e -35 a   0 box  8  det 0.95 sq 0.98 blink 0.94/0.05  pupil 2.7  glint  7.2/14.7
+d 65 e -35 a   0 box  8  det 0.96 sq 0.96 blink 0.94/0.04  pupil 2.5  glint  6.5/16.3
+d 30 e -20 a   0 box 16  det 0.75 sq 0.93 blink 0.94/0.25  pupil 2.3  glint  6.9/14.9
+d 45 e -20 a   0 box 16  det 0.93 sq 0.95 blink 1.00/0.07  pupil 2.5  glint  7.7/14.9
+d 65 e -20 a   0 box  8  det 0.96 sq 0.99 blink 0.89/0.04  pupil 2.4  glint  6.9/15.3
+d 30 e  -5 a   0 box 16  det 0.68 sq 0.90 blink 0.94/0.32  pupil 3.2  glint  6.8/14.9
+d 45 e  -5 a   0 box 16  det 0.94 sq 0.96 blink 1.00/0.06  pupil 3.0  glint  7.1/14.6
+d 65 e  -5 a   0 box  8  det 0.95 sq 0.98 blink 0.72/0.05  pupil 3.0  glint  7.9/14.0
+d 30 e  10 a   0 box 16  det 0.73 sq 0.94 blink 0.94/0.28  pupil 2.7  glint  5.3/10.6
+d 45 e  10 a   0 box 16  det 0.92 sq 0.96 blink 1.00/0.09  pupil 2.2  glint  4.7/ 9.0
+d 65 e  10 a   0 box  8  det 0.92 sq 0.98 blink 0.78/0.08  pupil 2.2  glint  4.8/ 8.1
+d 30 e  25 a   0 box 16  det 0.79 sq 0.94 blink 0.89/0.21  pupil 1.8  glint  2.7/ 6.1
+d 45 e  25 a   0 box 16  det 0.95 sq 0.96 blink 0.94/0.05  pupil 1.2  glint  2.2/ 4.0
+d 65 e  25 a   0 box  8  det 0.96 sq 0.99 blink 0.72/0.04  pupil 1.3  glint  2.3/ 3.0
+d 30 e -50 a  25 box  8  det 0.96 sq 0.98 blink 1.00/0.04  pupil 4.4  glint 10.1/13.7
+d 45 e -50 a  25 box  8  det 0.92 sq 0.93 blink 1.00/0.08  pupil 5.5  glint   - /  - 
+d 65 e -50 a  25 box  8  det 0.69 sq 0.25 blink 1.00/0.31  pupil 5.4  glint   - /  - 
+d 30 e -35 a  25 box 16  det 0.85 sq 0.98 blink 1.00/0.15  pupil 2.8  glint  9.7/16.3
+d 45 e -35 a  25 box  8  det 0.94 sq 0.96 blink 0.89/0.06  pupil 2.9  glint  8.3/15.4
+d 65 e -35 a  25 box  8  det 0.96 sq 0.98 blink 0.67/0.04  pupil 3.1  glint 15.2/18.7
+d 30 e -20 a  25 box 16  det 0.78 sq 0.93 blink 0.94/0.22  pupil 2.8  glint  8.0/16.3
+d 45 e -20 a  25 box  8  det 0.89 sq 0.93 blink 1.00/0.11  pupil 2.5  glint  7.1/15.0
+d 65 e -20 a  25 box  8  det 0.97 sq 0.99 blink 0.56/0.03  pupil 2.5  glint  7.1/14.1
+d 30 e  -5 a  25 box 16  det 0.66 sq 0.86 blink 0.89/0.34  pupil 3.7  glint  8.2/15.0
+d 45 e  -5 a  25 box 16  det 0.94 sq 0.98 blink 0.94/0.06  pupil 2.9  glint  7.8/15.7
+d 65 e  -5 a  25 box  8  det 0.96 sq 0.99 blink 0.56/0.04  pupil 3.2  glint  7.8/13.5
+d 30 e  10 a  25 box 16  det 0.77 sq 0.89 blink 0.94/0.23  pupil 3.0  glint  6.6/ 9.6
+d 45 e  10 a  25 box 16  det 0.91 sq 0.95 blink 1.00/0.09  pupil 2.9  glint  6.5/10.5
+d 65 e  10 a  25 box 16  det 0.95 sq 0.62 blink 0.72/0.05  pupil 2.9  glint  6.7/11.0
+d 30 e  25 a  25 box 16  det 0.86 sq 0.98 blink 0.94/0.14  pupil 3.3  glint  5.7/ 6.8
+d 45 e  25 a  25 box  8  det 0.96 sq 0.96 blink 1.00/0.05  pupil 2.5  glint  4.0/ 4.5
+d 65 e  25 a  25 box 16  det 0.99 sq 0.82 blink 0.39/0.01  pupil 2.7  glint  5.3/ 3.9
+d 30 e -50 a -25 box  8  det 0.96 sq 0.98 blink 1.00/0.05  pupil 4.0  glint  9.2/ 6.2
+d 45 e -50 a -25 box  8  det 0.91 sq 0.57 blink 1.00/0.09  pupil 5.7  glint   - / 3.3
+d 65 e -50 a -25 box  8  det 0.63 sq 0.26 blink 1.00/0.37  pupil 5.5  glint   - /  - 
+d 30 e -35 a -25 box 16  det 0.87 sq 0.95 blink 1.00/0.14  pupil 2.6  glint  9.6/14.6
+d 45 e -35 a -25 box  8  det 0.96 sq 0.96 blink 0.78/0.04  pupil 2.8  glint  6.1/15.4
+d 65 e -35 a -25 box  8  det 0.96 sq 0.96 blink 0.94/0.04  pupil 2.8  glint  8.1/14.7
+d 30 e -20 a -25 box 16  det 0.77 sq 0.98 blink 0.89/0.23  pupil 2.9  glint  7.9/15.6
+d 45 e -20 a -25 box 16  det 0.91 sq 0.96 blink 1.00/0.09  pupil 2.3  glint  6.5/14.2
+d 65 e -20 a -25 box  8  det 0.93 sq 0.96 blink 0.50/0.07  pupil 2.4  glint  6.8/14.1
+d 30 e  -5 a -25 box 16  det 0.69 sq 0.87 blink 0.89/0.31  pupil 2.8  glint  4.3/15.3
+d 45 e  -5 a -25 box 16  det 0.92 sq 0.98 blink 0.89/0.08  pupil 2.5  glint  5.0/13.3
+d 65 e  -5 a -25 box  8  det 0.94 sq 0.99 blink 0.67/0.06  pupil 2.7  glint  5.7/14.0
+d 30 e  10 a -25 box 16  det 0.67 sq 0.82 blink 1.00/0.33  pupil 2.6  glint  3.3/11.2
+d 45 e  10 a -25 box  8  det 0.91 sq 0.94 blink 0.94/0.10  pupil 2.0  glint  3.3/10.1
+d 65 e  10 a -25 box 16  det 0.98 sq 0.68 blink 0.56/0.02  pupil 2.3  glint  3.6/10.2
+d 30 e  25 a -25 box 16  det 0.72 sq 0.93 blink 1.00/0.28  pupil 1.3  glint  1.6/ 7.2
+d 45 e  25 a -25 box  8  det 0.95 sq 0.96 blink 1.00/0.05  pupil 1.7  glint  1.8/ 4.1
+d 65 e  25 a -25 box  8  det 0.99 sq 0.99 blink 0.11/0.02  pupil 1.1  glint  1.6/ 3.8

@@ -21,7 +21,7 @@ class Frame:
 
 
 def make_sequence(seconds: float = 60.0, seed: int = 0, slip_mm=(1.0, -1.5, 1.0),
-                  slip_deg=(2.0, 0.0, 1.0), slip_at: float = 0.5) -> list:
+                  slip_deg=(2.0, 0.0, 1.0), slip_at: float = 0.5, lidcal: bool = True) -> list:
     rng = np.random.default_rng(seed)
     frames = []
     pr = 2.5
@@ -32,7 +32,7 @@ def make_sequence(seconds: float = 60.0, seed: int = 0, slip_mm=(1.0, -1.5, 1.0)
             frames.append(Frame(EyeState(y, p, pr), "calib", i, k >= int(0.4 * FPS), zero))
     # lid calibration prompts: eyes open, squint, closed - looking around slowly each time
     for st_open, st_sq, label, secs in ((1.0, 0.0, "open", 4.0), (0.5, 0.7, "squint", 3.0),
-                                       (0.0, 0.0, "closed", 2.0)):
+                                       (0.0, 0.0, "closed", 2.0))[: 3 if lidcal else 0]:
         y0, p0 = rng.uniform(-15, 15), rng.uniform(-10, 10)
         for k in range(int(secs * FPS)):
             tt = k / FPS

@@ -31,11 +31,11 @@ def _setup(name, screen, narrow, glasses=0.0):
 
 def chunk(args):
     """Render frames [a, b) of one placement (one worker)."""
-    name, seconds, screen, seed, narrow, glasses, a, b = args
+    name, seconds, screen, seed, narrow, glasses, ss, lidcal, a, b = args
     sc, cam, _ = _setup(name, screen, narrow, glasses)
-    r = Renderer(sc, cam)
+    r = Renderer(sc, cam, ss=ss)
     r.noise_rng = np.random.default_rng(1000 + seed * 100000 + a)   # independent sensor noise per chunk
-    frames = make_sequence(seconds, seed)[a:b]
+    frames = make_sequence(seconds, seed, lidcal=lidcal)[a:b]
     look = Look()
     imgs, gts = [], []
     for fr in frames:
@@ -58,12 +58,14 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--narrow", action="store_true", help="narrower lid opening")
     ap.add_argument("--workers", type=int, default=30)
+    ap.add_argument("--ss", type=int, default=2, help="supersampling (1 = 4x faster, coarser glints)")
+    ap.add_argument("--no-lidcal", action="store_true", help="skip the open/squint/closed prompts")
     ap.add_argument("--glasses", type=float, default=0.0,
                     help="spectacle lens with this reflectance per surface (0 = none; 0.04 uncoated)")
     a = ap.parse_args()
-    n_frames = len(make_sequence(a.seconds, a.seed))
+    n_frames = len(make_sequence(a.seconds, a.seed, lidcal=not a.no_lidcal))
     step = 40
-    jobs = [(n, a.seconds, a.screen, a.seed, a.narrow, a.glasses, k, min(k + step, n_frames))
+    jobs = [(n, a.seconds, a.screen, a.seed, a.narrow, a.glasses, a.ss, not a.no_lidcal, k, min(k + step, n_frames))
             for n in a.names for k in range(0, n_frames, step)]
     parts = {n: {} for n in a.names}
     with Pool(a.workers) as p:

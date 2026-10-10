@@ -30,7 +30,21 @@ def make(name: str, screen_level: float = 0.0, seed: int = 1):
     """(Scene, Camera, info) for a placement name."""
     sc = Scene(seed=seed, screen_level=screen_level)
     info = {}
-    if name == "under_steep":          # tucked under the frame, close to the face
+    if name.startswith("sweep_"):
+        # sweep_d<dist>_e<elev>_a<azim>: camera <dist> mm from the corneal apex, <elev> deg
+        # above (+) / below (-) the line of sight, <azim> deg towards the nose (+) or the
+        # temple (-), aimed at the eye. LEDs fixed on the mirror frame sides, set wide (the
+        # best spot with glasses); a camera in front of the mirror plane sees through it.
+        parts = dict((p[0], float(p[1:].replace("m", "-"))) for p in name.split("_")[1:])
+        d, el, az = parts["d"], np.radians(parts["e"]), np.radians(parts["a"])
+        dirv = np.array([np.sin(az) * np.cos(el), np.sin(el), np.cos(az) * np.cos(el)])
+        pos = APEX + d * dirv
+        cam = Camera.looking_at(pos, _target())
+        lx, lz = parts.get("l", 32.0), parts.get("z", 40.0)   # optional _l<x>_z<z> LED position
+        sc.leds = [((-lx, 0.0, lz), 0.5), ((lx, 0.0, lz), 0.5)]
+        if pos[2] > PLATE_Z:
+            sc.plate = Plate(np.array([0.0, 0.0, PLATE_Z]), np.array([0.0, 0.0, 1.0]))
+    elif name == "under_steep":          # tucked under the frame, close to the face
         cam = Camera.looking_at([2.0, -27.0, 34.0], _target())
         sc.leds = [((-12.0, -24.0, 30.0), 0.5), ((14.0, -24.0, 30.0), 0.5)]
     elif name == "under":              # under the frame bottom edge, ~40 deg up

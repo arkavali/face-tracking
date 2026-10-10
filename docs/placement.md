@@ -62,7 +62,25 @@ Findings
    (as in the user's clip) and detection falls to 64%. An anti-reflection coating only
    dims the reflections (still saturated in the sim at 0.8% per surface). Best LED spots
    with glasses: top corners of the mirror frame, or the sides set wide (+-32 mm).
-7. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
+7. **How freely can the camera sit? (sweep, `tools/sweep.py`, `sweep_heat.png`).**
+   54 positions: 30 / 45 / 65 mm from the cornea, 50 deg below to 25 deg above the line of
+   sight, straight / 25 deg towards the nose / 25 deg towards the temple; glasses, narrow
+   lids, LEDs on the mirror frame sides; 30 s each (ss=1, checked against ss=2: same).
+   - **Distance:** 45-65 mm works everywhere tested. At 30 mm the eye overfills the 66 deg
+     frame and lashes come close: pupil found only 65-87%, 13-35% false blinks.
+   - **Height:** from 35 deg below to 25 deg above all good (pupil 91-99%, squint
+     93-99%). 50 deg below is the edge: fine at 30-45 mm straight, but far (65 mm) or
+     sideways it drops to 63-69% and squint to 25-57%.
+   - **Sideways** up to 25 deg barely matters (the nose is not modelled: nasal
+     placements may be blocked by it).
+   - **Accuracy** after a 9-point calibration: 1-2 deg from above, 2-3 deg level, 4-6 deg
+     from 50 deg below.
+   - **Mask slip** remains the weak spot: with narrow lids the glint correction is only
+     reliable from above (3-4 deg after the slip across all distances / angles); level or
+     from below it varies 4-16 deg between runs (a 60 s and a 30 s run of the same
+     placement gave 4.2 vs 12.6 deg), so it needs the real eye to judge.
+   - The blink numbers per cell rest on only ~10 closed frames (3-4 blinks): noisy.
+8. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
    closed eye (fixed by the gate, see 4); squint from the front (needs real IR footage);
    glint pairs with narrow lids still sometimes wrong.
 
