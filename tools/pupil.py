@@ -57,7 +57,7 @@ class Ellipse:
 def darkest_seed(img: np.ndarray, box: int):
     """Centre (x, y) and mean of the darkest box, searched on a 2x-downsampled frame."""
     h, w = img.shape
-    s = img[: h // 2 * 2, : w // 2 * 2].astype(np.float32)
+    s = img[: h // 2 * 2, : w // 2 * 2].astype(np.float64)
     s = (s[0::2, 0::2] + s[1::2, 0::2] + s[0::2, 1::2] + s[1::2, 1::2]) / 4
     # glints would pull a box mean up; clip bright pixels to keep a pupil with a glint dark
     s = np.minimum(s, 120)
@@ -92,7 +92,7 @@ def starburst(img: np.ndarray, seed, level: float, p: PupilParams):
     xs = seed[0] + np.cos(th)[:, None] * r[None]
     ys = seed[1] + np.sin(th)[:, None] * r[None]
     inside = (xs >= 0) & (xs < w - 1) & (ys >= 0) & (ys < h - 1)
-    prof = _bilinear(img.astype(np.float32), xs, ys)
+    prof = _bilinear(img.astype(np.float64), xs, ys)
     pts = []
     for i in range(p.rays):
         v = prof[i]
@@ -185,13 +185,36 @@ def _dist(pts, prm):
     return np.abs(rr - 1) * np.hypot(u, v) / np.maximum(rr, 1e-9)
 
 
+class XorShift32:
+    """Tiny deterministic generator shared with the C++ port (same subsets in both)."""
+
+    def __init__(self, seed: int = 2463534242):
+        self.s = seed & 0xFFFFFFFF or 1
+
+    def next(self) -> int:
+        x = self.s
+        x ^= (x << 13) & 0xFFFFFFFF
+        x ^= x >> 17
+        x ^= (x << 5) & 0xFFFFFFFF
+        self.s = x
+        return x
+
+    def subset(self, n: int, k: int) -> list:
+        out = []
+        while len(out) < k:
+            i = self.next() % n
+            if i not in out:
+                out.append(i)
+        return out
+
+
 def ransac_ellipse(pts: np.ndarray, p: PupilParams, rng):
     if len(pts) < p.min_points:
         return None, None
     best, best_in = None, None
     n = len(pts)
     for _ in range(p.ransac_iter):
-        sub = pts[rng.choice(n, 5, replace=False)]
+        sub = pts[rng.subset(n, 5)]
         c = fit_ellipse(sub)
         if c is None:
             continue
@@ -213,12 +236,12 @@ def ransac_ellipse(pts: np.ndarray, p: PupilParams, rng):
 class PupilDetector:
     def __init__(self, p: PupilParams | None = None, seed: int = 0):
         self.p = p or PupilParams()
-        self.rng = np.random.default_rng(seed)
+        self.rng = XorShift32(2463534242 + seed)
 
     def detect(self, img: np.ndarray) -> Ellipse | None:
         p = self.p
         # 3x3 box blur twice (cheap, separable): tames sensor noise before the ray search
-        img = img.astype(np.float32)
+        img = img.astype(np.float64)
         for _ in range(2):
             img = (np.pad(img, ((1, 1), (0, 0)), mode="edge")[:-2] + img
                    + np.pad(img, ((1, 1), (0, 0)), mode="edge")[2:]) / 3

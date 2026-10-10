@@ -9,7 +9,27 @@ the minor axes of many pupil ellipses, gaze = centre -> pupil), reworked for the
 starburst rays + Fitzgibbon ellipse fit with RANSAC instead of OpenCV contours, and the
 eye-sphere model re-estimated continuously (slow forgetting) so it follows mask slip.
 
-The boards are not here yet, so everything so far runs on a synthetic eye.
+The boards are not here yet (ESP32-S3 CAM N16R8 + OV2640 66 deg no-IR, ~2026-10-20): the
+tracker was developed on a synthetic eye, the firmware builds but has not run on hardware.
+
+## Quick start (double-click in the repo folder, once the board is here)
+
+| File | What it does |
+|---|---|
+| `flash_firmware.bat` | Build `firmware/` and flash the ESP32-S3 CAM over its "USB" port |
+| `eye_live.bat COMx` | Live view with the tracker overlay (pupil ellipse, eyeball centre, glints); R records to `out/cam` |
+| `serial_monitor.bat` | Plain text console of the board |
+
+## Firmware (`firmware/`, ESP32-S3 CAM, OV2640)
+
+`lib/eye_core` is the C++ port of `pupil.py` + `eyemodel.py` (detector, gate, glints,
+eye-sphere model). `tools/parity_test.py` builds it for the PC with zig and compares it
+with Python: double precision matches to ~1e-11, the float build (as on the ESP) to
+~0.2 px with an occasional different RANSAC pick; 0.2 ms/frame on the PC. Commands and
+the EYE output line: header of `firmware/src/main.cpp`. The camera pin map is the
+Freenove / ESP32-S3-EYE layout and must be checked against the boards. Gaze calibration
+(AR target points, glint mapping, blink ranges) is meant to run on the hub from the raw
+values.
 
 ## Tools (`tools/`)
 
@@ -25,6 +45,9 @@ The boards are not here yet, so everything so far runs on a synthetic eye.
 | `evaluate.py` | Detector + model + calibrations (pupil, pupil-glint, pupil-centre, model) on rendered sequences vs ground truth (`out/eval/`) |
 | `own_video.py` | Detector on the user's phone clips (visible light, geometry check only) |
 | `dbg_detect.py` | Debug sheet: edge points and ellipses on the preview states |
+| `lids.py` | Patch-regression eyelid estimator (did not generalise on the simulated lids; kept for real footage) |
+| `parity_test.py` | C++ core vs Python on rendered sequences or videos |
+| `eye_cam.py` | Serial helper: snap, live view, recording (`eye_live.bat`) |
 
 Placement comparison: [docs/placement.md](docs/placement.md).
 
