@@ -7,7 +7,7 @@
 extern "C" {
 
 struct Ctx {
-  eye::real* work;
+  uint16_t* work;
   eye::PupilDetector* det;
   eye::PupilGate gate;
   eye::EyeModel* model;
@@ -15,7 +15,7 @@ struct Ctx {
 
 __declspec(dllexport) void* eye_new(int w, int h, double f) {
   auto* c = new Ctx();
-  c->work = static_cast<eye::real*>(malloc(sizeof(eye::real) * w * h));
+  c->work = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * w * h));
   c->det = new eye::PupilDetector(c->work, w, h);
   c->model = new eye::EyeModel(static_cast<eye::real>(f), w, h);
   return c;

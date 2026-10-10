@@ -1,7 +1,7 @@
 // Eye tracker core: C++ port of tools/pupil.py and tools/eyemodel.py, no Arduino
 // dependencies.
 //
-// PupilDetector: 3x3 box blur x2, darkest box seed on a 2x-downsampled frame, starburst
+// PupilDetector: 3x3 box blur x2 (integer, separable), darkest box seed on a 2x-downsampled frame, starburst
 // rays (glint skip, sub-pixel step), RANSAC over 5-point subsets with the Fitzgibbon
 // direct ellipse fit, refit on inliers, dark-inside / ring-contrast / upper-lid checks.
 // PupilGate: rejects weak pupils against the running median contrast.
@@ -75,12 +75,18 @@ class XorShift32 {
 
 class PupilDetector {
  public:
-  // work: w*h reals of scratch memory (PSRAM on the ESP32), kept by the caller.
-  PupilDetector(real* work, int w, int h, const Params& p = Params(), uint32_t seed = 0);
+  // work: w*h uint16 of scratch memory kept by the caller (internal RAM on the ESP32 if it
+  // fits: ~150 KB at 320x240; PSRAM works but the blur gets slower).
+  PupilDetector(uint16_t* work, int w, int h, const Params& p = Params(), uint32_t seed = 0);
+  ~PupilDetector();
   // true and *out filled when a pupil is found.
   bool detect(const uint8_t* img, Ellipse* out);
-  const real* blurred() const { return buf_; }
+  // Blurred frame x 81 (two 3x3 box passes, integer sums).
+  const uint16_t* blurred81() const { return buf_; }
   const Params& params() const { return p_; }
+  // Microseconds spent in blur, seed, starburst, ransac, checks during the last detect()
+  // (filled only when built with EYE_PROFILE).
+  uint32_t prof_us[5] = {0, 0, 0, 0, 0};
 
  private:
   void blur(const uint8_t* img);
@@ -88,8 +94,8 @@ class PupilDetector {
   int starburst(real sx, real sy, real level, real* px, real* py);
   real at(real x, real y) const;  // bilinear on the blurred frame, clamped
 
-  real* buf_;
-  real* tmp_ = nullptr;
+  uint16_t* buf_;
+  uint16_t* rows_ = nullptr;  // 5 horizontally filtered rows (ring)
   int w_, h_;
   Params p_;
   XorShift32 rng_;

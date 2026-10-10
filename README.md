@@ -31,6 +31,14 @@ Freenove / ESP32-S3-EYE layout and must be checked against the boards. Gaze cali
 (AR target points, glint mapping, blink ranges) is meant to run on the hub from the raw
 values.
 
+Measured on a real ESP32-S3 N16R8 (the hub test board, camera-less bench env `s3bench`,
+frames sent from the PC by `tools/hw_bench.py`, 2026-10-10): detect + gate + model + glints
+**26.7 ms per 320x240 frame** (blur 12, seed 4.5, starburst 2.8, RANSAC 5.4 ms), results
+equal to the host float build (1 borderline frame of 200 differs). The first port took
+163 ms (float blur in PSRAM, double-precision ellipse fit); the blur is now integer and
+separable with its buffer in internal RAM, and the fit uses float. Further headroom if
+needed: seed on the raw downsampled frame and blur only a window around the pupil.
+
 ## Tools (`tools/`)
 
 | Script | What it does |
@@ -47,6 +55,7 @@ values.
 | `dbg_detect.py` | Debug sheet: edge points and ellipses on the preview states |
 | `lids.py` | Patch-regression eyelid estimator (did not generalise on the simulated lids; kept for real footage) |
 | `parity_test.py` | C++ core vs Python on rendered sequences or videos |
+| `hw_bench.py`, `hw_profile.py` | Run the core on an S3 flashed with env `s3bench` (timing, parity, per-stage profile) |
 | `eye_cam.py` | Serial helper: snap, live view, recording (`eye_live.bat`) |
 
 Placement comparison: [docs/placement.md](docs/placement.md).

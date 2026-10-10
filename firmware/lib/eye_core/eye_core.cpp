@@ -2,7 +2,15 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+
+#ifdef EYE_PROFILE
+extern "C" int64_t esp_timer_get_time();
+#define EYE_T() static_cast<uint32_t>(esp_timer_get_time())
+#else
+#define EYE_T() 0u
+#endif
 
 namespace eye {
 
@@ -36,8 +44,8 @@ real median(const real* v, int n, real* scratch) {
 }
 
 // 3x3 solve by Gaussian elimination with partial pivoting; false if singular.
-bool solve3(const double A[3][3], const double* b, int nrhs, double* x) {
-  double M[3][3 + 3];
+bool solve3(const real A[3][3], const real* b, int nrhs, real* x) {
+  real M[3][3 + 3];
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 3; ++j) M[i][j] = A[i][j];
     for (int k = 0; k < nrhs; ++k) M[i][3 + k] = b[i * nrhs + k];
@@ -46,16 +54,16 @@ bool solve3(const double A[3][3], const double* b, int nrhs, double* x) {
     int piv = c;
     for (int r = c + 1; r < 3; ++r)
       if (fabs(M[r][c]) > fabs(M[piv][c])) piv = r;
-    if (fabs(M[piv][c]) < 1e-300) return false;
+    if (fabs(M[piv][c]) < 1e-30) return false;
     if (piv != c)
       for (int j = 0; j < 3 + nrhs; ++j) {
-        double t = M[c][j];
+        real t = M[c][j];
         M[c][j] = M[piv][j];
         M[piv][j] = t;
       }
     for (int r = 0; r < 3; ++r) {
       if (r == c) continue;
-      double f = M[r][c] / M[c][c];
+      real f = M[r][c] / M[c][c];
       for (int j = c; j < 3 + nrhs; ++j) M[r][j] -= f * M[c][j];
     }
   }
@@ -65,39 +73,39 @@ bool solve3(const double A[3][3], const double* b, int nrhs, double* x) {
 }
 
 // Real eigenvalues of a 3x3 matrix (characteristic cubic); returns how many.
-int eig3Real(const double M[3][3], double* lam) {
-  double a = -(M[0][0] + M[1][1] + M[2][2]);
-  double b = M[0][0] * M[1][1] - M[0][1] * M[1][0] + M[0][0] * M[2][2] - M[0][2] * M[2][0] +
+int eig3Real(const real M[3][3], real* lam) {
+  real a = -(M[0][0] + M[1][1] + M[2][2]);
+  real b = M[0][0] * M[1][1] - M[0][1] * M[1][0] + M[0][0] * M[2][2] - M[0][2] * M[2][0] +
              M[1][1] * M[2][2] - M[1][2] * M[2][1];
-  double c = -(M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) -
+  real c = -(M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) -
                M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) +
                M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]));
   // depressed cubic t^3 + p t + q, x = t - a/3
-  double p = b - a * a / 3, q = 2 * a * a * a / 27 - a * b / 3 + c;
-  double disc = q * q / 4 + p * p * p / 27;
+  real p = b - a * a / 3, q = 2 * a * a * a / 27 - a * b / 3 + c;
+  real disc = q * q / 4 + p * p * p / 27;
   if (disc > 0) {
-    double s = sqrt(disc);
+    real s = sqrt(disc);
     lam[0] = cbrt(-q / 2 + s) + cbrt(-q / 2 - s) - a / 3;
     return 1;
   }
-  double r = sqrt(-p / 3);
-  double arg = r > 0 ? clampv(-q / (2 * r * r * r), -1.0, 1.0) : 0.0;
-  double phi = acos(arg);
+  real r = sqrt(-p / 3);
+  real arg = r > 0 ? clampv(-q / (2 * r * r * r), real(-1), real(1)) : real(0);
+  real phi = acos(arg);
   for (int k = 0; k < 3; ++k) lam[k] = 2 * r * cos((phi - 2 * kPi * k) / 3) - a / 3;
   return 3;
 }
 
 // Null vector of (M - lam I) from the largest cross product of its rows.
-void nullVec3(const double M[3][3], double lam, double v[3]) {
-  double R[3][3];
+void nullVec3(const real M[3][3], real lam, real v[3]) {
+  real R[3][3];
   for (int i = 0; i < 3; ++i)
     for (int j = 0; j < 3; ++j) R[i][j] = M[i][j] - (i == j ? lam : 0);
-  double best = -1;
+  real best = -1;
   for (int i = 0; i < 3; ++i) {
-    const double* u = R[i];
-    const double* w = R[(i + 1) % 3];
-    double c[3] = {u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]};
-    double n = c[0] * c[0] + c[1] * c[1] + c[2] * c[2];
+    const real* u = R[i];
+    const real* w = R[(i + 1) % 3];
+    real c[3] = {u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]};
+    real n = c[0] * c[0] + c[1] * c[1] + c[2] * c[2];
     if (n > best) {
       best = n;
       v[0] = c[0];
@@ -113,24 +121,24 @@ void nullVec3(const double M[3][3], double lam, double v[3]) {
 
 bool fitEllipse(const real* xs, const real* ys, int n, real conic[6]) {
   if (n < 5) return false;
-  double mx = 0, my = 0;
+  real mx = 0, my = 0;
   for (int i = 0; i < n; ++i) {
     mx += xs[i];
     my += ys[i];
   }
   mx /= n;
   my /= n;
-  double sx = 0, sy = 0;
+  real sx = 0, sy = 0;
   for (int i = 0; i < n; ++i) {
     sx = fmax(sx, fabs(xs[i] - mx));
     sy = fmax(sy, fabs(ys[i] - my));
   }
   sx = fmax(sx, 1e-6);
   sy = fmax(sy, 1e-6);
-  double S1[3][3] = {}, S2[3][3] = {}, S3[3][3] = {};
+  real S1[3][3] = {}, S2[3][3] = {}, S3[3][3] = {};
   for (int i = 0; i < n; ++i) {
-    double x = (xs[i] - mx) / sx, y = (ys[i] - my) / sy;
-    double d1[3] = {x * x, x * y, y * y}, d2[3] = {x, y, 1};
+    real x = (xs[i] - mx) / sx, y = (ys[i] - my) / sy;
+    real d1[3] = {x * x, x * y, y * y}, d2[3] = {x, y, 1};
     for (int r = 0; r < 3; ++r)
       for (int c = 0; c < 3; ++c) {
         S1[r][c] += d1[r] * d1[c];
@@ -139,31 +147,31 @@ bool fitEllipse(const real* xs, const real* ys, int n, real conic[6]) {
       }
   }
   // T = -S3^-1 S2^T
-  double S2T[9];
+  real S2T[9];
   for (int r = 0; r < 3; ++r)
     for (int c = 0; c < 3; ++c) S2T[r * 3 + c] = S2[c][r];
-  double T[9];
+  real T[9];
   if (!solve3(S3, S2T, 3, T)) return false;
-  for (double& t : T) t = -t;
-  double M0[3][3];
+  for (real& t : T) t = -t;
+  real M0[3][3];
   for (int r = 0; r < 3; ++r)
     for (int c = 0; c < 3; ++c) {
-      double s = 0;
+      real s = 0;
       for (int k = 0; k < 3; ++k) s += S2[r][k] * T[k * 3 + c];
       M0[r][c] = S1[r][c] + s;
     }
-  double M[3][3];
+  real M[3][3];
   for (int c = 0; c < 3; ++c) {
     M[0][c] = M0[2][c] / 2;
     M[1][c] = -M0[1][c];
     M[2][c] = M0[0][c] / 2;
   }
-  double lam[3];
+  real lam[3];
   int nl = eig3Real(M, lam);
-  double a1[3];
+  real a1[3];
   bool found = false;
   for (int k = 0; k < nl && !found; ++k) {
-    double v[3];
+    real v[3];
     nullVec3(M, lam[k], v);
     if (4 * v[0] * v[2] - v[1] * v[1] > 0) {
       a1[0] = v[0];
@@ -173,11 +181,11 @@ bool fitEllipse(const real* xs, const real* ys, int n, real conic[6]) {
     }
   }
   if (!found) return false;
-  double a2[3];
+  real a2[3];
   for (int r = 0; r < 3; ++r) a2[r] = T[r * 3] * a1[0] + T[r * 3 + 1] * a1[1] + T[r * 3 + 2] * a1[2];
-  double A = a1[0], B = a1[1], C = a1[2], D = a2[0], E = a2[1], F = a2[2];
-  double A2 = A / (sx * sx), B2 = B / (sx * sy), C2 = C / (sy * sy);
-  double D2 = D / sx, E2 = E / sy;
+  real A = a1[0], B = a1[1], C = a1[2], D = a2[0], E = a2[1], F = a2[2];
+  real A2 = A / (sx * sx), B2 = B / (sx * sy), C2 = C / (sy * sy);
+  real D2 = D / sx, E2 = E / sy;
   conic[0] = real(A2);
   conic[1] = real(B2);
   conic[2] = real(C2);
@@ -188,23 +196,23 @@ bool fitEllipse(const real* xs, const real* ys, int n, real conic[6]) {
 }
 
 bool conicToParams(const real c[6], real* cx, real* cy, real* a, real* b, real* ang) {
-  double A = c[0], B = c[1], C = c[2], D = c[3], E = c[4], F = c[5];
-  double m00 = A, m01 = B / 2, m11 = C;
-  double det = 4 * (m00 * m11 - m01 * m01);  // det(2M)
-  if (fabs(det) < 1e-300) return false;
-  double x = (-D * 2 * m11 + E * 2 * m01) / det;
-  double y = (-E * 2 * m00 + D * 2 * m01) / det;
-  double k = A * x * x + B * x * y + C * y * y + D * x + E * y + F;
+  real A = c[0], B = c[1], C = c[2], D = c[3], E = c[4], F = c[5];
+  real m00 = A, m01 = B / 2, m11 = C;
+  real det = 4 * (m00 * m11 - m01 * m01);  // det(2M)
+  if (fabs(det) < 1e-30) return false;
+  real x = (-D * 2 * m11 + E * 2 * m01) / det;
+  real y = (-E * 2 * m00 + D * 2 * m01) / det;
+  real k = A * x * x + B * x * y + C * y * y + D * x + E * y + F;
   // eigen of the symmetric 2x2 [[m00, m01], [m01, m11]], ascending like numpy.eigh
-  double tr = m00 + m11, dd = sqrt((m00 - m11) * (m00 - m11) / 4 + m01 * m01);
-  double l0 = tr / 2 - dd, l1 = tr / 2 + dd;
-  double q0 = -k / l0, q1 = -k / l1;
+  real tr = m00 + m11, dd = sqrt((m00 - m11) * (m00 - m11) / 4 + m01 * m01);
+  real l0 = tr / 2 - dd, l1 = tr / 2 + dd;
+  real q0 = -k / l0, q1 = -k / l1;
   if (!(q0 > 0 && q1 > 0)) return false;
-  double ax0 = sqrt(q0), ax1 = sqrt(q1);
-  double lmaj = ax0 >= ax1 ? l0 : l1;
+  real ax0 = sqrt(q0), ax1 = sqrt(q1);
+  real lmaj = ax0 >= ax1 ? l0 : l1;
   // eigenvector of lmaj
-  double vx, vy;
-  if (fabs(m01) > 1e-300) {
+  real vx, vy;
+  if (fabs(m01) > 1e-30) {
     vx = lmaj - m11;
     vy = m01;
   } else {
@@ -234,69 +242,109 @@ real ellipseDist(real px, real py, real cx, real cy, real a, real b, real ang) {
 
 // ----------------------------------------------------------------------------- detector
 
-PupilDetector::PupilDetector(real* work, int w, int h, const Params& p, uint32_t seed)
+PupilDetector::PupilDetector(uint16_t* work, int w, int h, const Params& p, uint32_t seed)
     : buf_(work), w_(w), h_(h), p_(p), rng_(2463534242u + seed) {
-  tmp_ = static_cast<real*>(malloc(sizeof(real) * w * h));
+  rows_ = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * 5 * w));
 }
 
+PupilDetector::~PupilDetector() { free(rows_); }
+
+namespace {
+
+inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+// Two edge-padded 3-tap box passes along one axis, as integer sums (x 9):
+// out[q] = sum_{i,j in -1..1} in[clamp(clamp(q + i) + j)]; interior weights 1 2 3 2 1.
+inline void hfilter2(const uint8_t* in, uint16_t* out, int w) {
+  for (int x = 2; x < w - 2; ++x)
+    out[x] = uint16_t(in[x - 2] + 2 * in[x - 1] + 3 * in[x] + 2 * in[x + 1] + in[x + 2]);
+  const int edge[4] = {0, 1, w - 2, w - 1};
+  for (int x : edge) {
+    int s = 0;
+    for (int i = -1; i <= 1; ++i)
+      for (int j = -1; j <= 1; ++j) s += in[clampi(clampi(x + i, 0, w - 1) + j, 0, w - 1)];
+    out[x] = uint16_t(s);
+  }
+}
+
+}  // namespace
+
 void PupilDetector::blur(const uint8_t* img) {
+  // Same result as the Python reference (vertical then horizontal 3x3 box, twice, with
+  // edge padding): the passes are separable and commute, so each row is filtered
+  // horizontally once (ring of 5 rows) and the vertical double pass sums 9 row indices.
   const int w = w_, h = h_;
-  for (int i = 0; i < w * h; ++i) buf_[i] = img[i];
-  for (int pass = 0; pass < 2; ++pass) {
-    // vertical, edge padded (numpy: (up + centre + down) / 3)
-    for (int y = 0; y < h; ++y) {
-      const real* up = buf_ + (y > 0 ? y - 1 : 0) * w;
-      const real* ce = buf_ + y * w;
-      const real* dn = buf_ + (y < h - 1 ? y + 1 : h - 1) * w;
-      real* o = tmp_ + y * w;
-      for (int x = 0; x < w; ++x) o[x] = (up[x] + ce[x] + dn[x]) / 3;
+  auto row = [&](int r) { return rows_ + (r % 5) * w; };
+  int have = -1;  // last filtered source row
+  for (int y = 0; y < h; ++y) {
+    const int need = y + 2 < h ? y + 2 : h - 1;
+    while (have < need) {
+      ++have;
+      hfilter2(img + have * w, row(have), w);
     }
-    for (int y = 0; y < h; ++y) {
-      const real* r = tmp_ + y * w;
-      real* o = buf_ + y * w;
+    uint16_t* o = buf_ + y * w;
+    if (y >= 2 && y < h - 2) {
+      const uint16_t *a = row(y - 2), *b = row(y - 1), *c = row(y), *d = row(y + 1), *e = row(y + 2);
+      for (int x = 0; x < w; ++x) o[x] = uint16_t(a[x] + 2 * b[x] + 3 * c[x] + 2 * d[x] + e[x]);  // x 81, max 20655
+    } else {
+      int idx[9], k = 0;
+      for (int i = -1; i <= 1; ++i)
+        for (int j = -1; j <= 1; ++j) idx[k++] = clampi(clampi(y + i, 0, h - 1) + j, 0, h - 1);
       for (int x = 0; x < w; ++x) {
-        real l = r[x > 0 ? x - 1 : 0], c = r[x], rr = r[x < w - 1 ? x + 1 : w - 1];
-        o[x] = (l + c + rr) / 3;
+        int s = 0;
+        for (int q = 0; q < 9; ++q) s += row(idx[q])[x];
+        o[x] = uint16_t(s);
       }
     }
   }
 }
 
 void PupilDetector::seed(real* sx, real* sy, real* level) {
+  // Darkest k x k box on the 2x-downsampled frame (values clipped at 120 grey levels so a
+  // glint does not lift a pupil's mean), border of 3 cells ignored. Running column sums.
   const int hw = w_ / 2, hh = h_ / 2;
   const int k = p_.box / 2 > 2 ? p_.box / 2 : 2;
-  // integral image of the 2x-downsampled, clipped frame (in tmp_)
-  real* ii = tmp_;  // (hh + 1) x (hw + 1)
-  const int W1 = hw + 1;
-  for (int x = 0; x <= hw; ++x) ii[x] = 0;
-  for (int y = 0; y < hh; ++y) {
-    ii[(y + 1) * W1] = 0;
-    real rowsum = 0;
-    for (int x = 0; x < hw; ++x) {
-      const real* r0 = buf_ + (2 * y) * w_ + 2 * x;
-      const real* r1 = r0 + w_;
-      real s = (r0[0] + r1[0] + r0[1] + r1[1]) / 4;
-      if (s > 120) s = 120;
-      rowsum += s;
-      ii[(y + 1) * W1 + x + 1] = ii[y * W1 + x + 1] + rowsum;
-    }
-  }
   const int bd = 3;
   const int mh = hh + 1 - k, mw = hw + 1 - k;
-  real best = real(1e30);
+  const int clip = 120 * 81 * 4;
+  static int32_t col[512];
+  static int32_t cells[512];
+  for (int x = 0; x < hw; ++x) col[x] = 0;
+  int64_t best = INT64_MAX;
   int bx = 0, by = 0;
-  for (int y = bd; y < mh - bd; ++y)
-    for (int x = bd; x < mw - bd; ++x) {
-      real m = (ii[(y + k) * W1 + x + k] - ii[y * W1 + x + k] - ii[(y + k) * W1 + x] + ii[y * W1 + x]) / (k * k);
-      if (m < best) {
-        best = m;
-        bx = x;
-        by = y;
+  for (int y = 0; y < hh; ++y) {
+    const uint16_t* r0 = buf_ + (2 * y) * w_;
+    const uint16_t* r1 = r0 + w_;
+    for (int x = 0; x < hw; ++x) {
+      int v = r0[2 * x] + r0[2 * x + 1] + r1[2 * x] + r1[2 * x + 1];
+      if (v > clip) v = clip;
+      cells[x] = v;
+      col[x] += v;
+    }
+    if (y >= k) {  // drop the row that left the window
+      const uint16_t* q0 = buf_ + (2 * (y - k)) * w_;
+      const uint16_t* q1 = q0 + w_;
+      for (int x = 0; x < hw; ++x) {
+        int v = q0[2 * x] + q0[2 * x + 1] + q1[2 * x] + q1[2 * x + 1];
+        col[x] -= v > clip ? clip : v;
       }
     }
+    const int top = y - k + 1;  // window rows top..y
+    if (top < bd || top >= mh - bd) continue;
+    int64_t s = 0;
+    for (int x = 0; x < k; ++x) s += col[x];
+    for (int x = 0; x < mw; ++x) {
+      if (x > 0) s += col[x + k - 1] - col[x - 1];
+      if (x >= bd && x < mw - bd && s < best) {
+        best = s;
+        bx = x;
+        by = top;
+      }
+    }
+  }
   *sx = real(2 * bx + k);
   *sy = real(2 * by + k);
-  *level = best;
+  *level = real(best) / real(k * k * 4 * 81);
 }
 
 real PupilDetector::at(real x, real y) const {
@@ -304,11 +352,11 @@ real PupilDetector::at(real x, real y) const {
   y = clampv(y, real(0), real(h_ - 1.001));
   int x0 = int(x), y0 = int(y);
   real fx = x - x0, fy = y - y0;
-  const real* r0 = buf_ + y0 * w_ + x0;
-  const real* r1 = r0 + w_;
+  const uint16_t* r0 = buf_ + y0 * w_ + x0;
+  const uint16_t* r1 = r0 + w_;
   real a = r0[0] * (1 - fx) + r0[1] * fx;
   real b = r1[0] * (1 - fx) + r1[1] * fx;
-  return a * (1 - fy) + b * fy;
+  return (a * (1 - fy) + b * fy) * real(1.0 / 81);
 }
 
 int PupilDetector::starburst(real sx, real sy, real level, real* px, real* py) {
@@ -365,9 +413,15 @@ int PupilDetector::starburst(real sx, real sy, real level, real* px, real* py) {
 }
 
 bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
+  uint32_t t0 = EYE_T();
+  for (uint32_t& v : prof_us) v = 0;
   blur(img);
+  uint32_t t1 = EYE_T();
+  prof_us[0] = t1 - t0;
   real sx, sy, level;
   seed(&sx, &sy, &level);
+  uint32_t t2 = EYE_T();
+  prof_us[1] = t2 - t1;
   real px[kMaxRays], py[kMaxRays], scratch[kMaxRays];
   int n = 0;
   for (int round = 0; round < p_.rounds; ++round) {
@@ -379,6 +433,8 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
     sy = ny;
     if (done) break;
   }
+  uint32_t t3 = EYE_T();
+  prof_us[2] = t3 - t2;
   // RANSAC
   bool have = false;
   real best[5] = {0, 0, 0, 0, 0};
@@ -425,6 +481,8 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
   real conic[6], prm[5];
   if (!(fitEllipse(ix, iy, ni, conic) && conicToParams(conic, &prm[0], &prm[1], &prm[2], &prm[3], &prm[4])))
     memcpy(prm, best, sizeof(prm));
+  uint32_t t4 = EYE_T();
+  prof_us[3] = t4 - t3;
   real cx = prm[0], cy = prm[1], a = prm[2], b = prm[3], ang = prm[4];
   if (a > p_.r_max * real(1.2) || ni < p_.min_support * p_.rays) return false;
   // dark inside
@@ -432,14 +490,14 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
     int y0 = int(cy - b), y1 = int(cy + b), x0 = int(cx - b), x1 = int(cx + b);
     if (y0 < 0) y0 = 0;
     if (x0 < 0) x0 = 0;
-    double s = 0;
+    int64_t s = 0;
     int c = 0;
     for (int y = y0; y <= y1 && y < h_; ++y)
       for (int x = x0; x <= x1 && x < w_; ++x) {
-        s += buf_[y * w_ + x];
+        s += buf_[y * w_ + x];  // x 81
         ++c;
       }
-    if (c == 0 || real(s / c) - level > p_.max_inside) return false;
+    if (c == 0 || real(s) / (real(c) * 81) - level > p_.max_inside) return false;
   }
   // ring contrast
   real ca = cos(ang), sa = sin(ang);
@@ -472,6 +530,7 @@ bool PupilDetector::detect(const uint8_t* img, Ellipse* out) {
   out->n = ni;
   out->contrast = contrast;
   out->top_vis = top;
+  prof_us[4] = EYE_T() - t4;
   return true;
 }
 
@@ -516,7 +575,7 @@ int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, i
     for (int xx = 0; xx < bw; ++xx) {
       if (seen[yy * bw + xx] || img[(yy + y0) * w + xx + x0] < level) continue;
       int sp = 0, cnt = 0;
-      double sxs = 0, sys = 0;
+      int64_t sxs = 0, sys = 0;
       stack[sp++] = yy * bw + xx;
       seen[yy * bw + xx] = 1;
       while (sp) {

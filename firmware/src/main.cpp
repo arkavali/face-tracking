@@ -21,10 +21,12 @@
 //   gx/gy/gz = gaze unit vector in camera axes, g1/g2 = the two nearest corneal glints.
 // The wearer-specific calibration (AR target points, glint mapping, blink/squint ranges)
 // runs on the hub / PC from these raw values.
+#ifndef EYE_BENCH  // see bench_main.cpp for the camera-less bench build
 #include <Arduino.h>
 
 #include "camera_pins.h"
 #include "esp_camera.h"
+#include "esp_heap_caps.h"
 #include "eye_core.h"
 
 SET_LOOP_TASK_STACK_SIZE(16 * 1024);
@@ -35,7 +37,7 @@ constexpr int kW = 320;
 constexpr int kH = 240;
 constexpr float kFocalPx = 308.0f;  // OV2640 66 deg diagonal at 320x240 (pinhole estimate)
 
-eye::real* work = nullptr;  // PSRAM scratch for the detector
+uint16_t* work = nullptr;  // detector scratch (internal RAM if it fits)
 eye::PupilDetector* detector = nullptr;
 eye::PupilGate gate;
 eye::EyeModel* model = nullptr;
@@ -166,9 +168,9 @@ void handleCommand(String cmd) {
   } else if (w == "bench") {
     camera_fb_t* fb = grabFull();
     if (!fb) return;
-    static eye::real* benchWork = nullptr;  // separate detector: keeps the live RANSAC state
-    if (!benchWork) benchWork = static_cast<eye::real*>(ps_malloc(sizeof(eye::real) * kW * kH));
-    static eye::PupilDetector* det = new eye::PupilDetector(benchWork, kW, kH);
+    // separate detector (keeps the live RANSAC state); shares the scratch buffer, which
+    // the live detector refills on the next frame anyway
+    static eye::PupilDetector* det = new eye::PupilDetector(work, kW, kH);
     eye::Ellipse e;
     int found = 0;
     uint32_t t0 = micros();
@@ -248,7 +250,8 @@ void setup() {
     delay(200);
     esp_restart();
   }
-  work = static_cast<eye::real*>(ps_malloc(sizeof(eye::real) * kW * kH));
+  work = static_cast<uint16_t*>(heap_caps_malloc(sizeof(uint16_t) * kW * kH, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+  if (!work) work = static_cast<uint16_t*>(ps_malloc(sizeof(uint16_t) * kW * kH));
   pvBuf = static_cast<uint8_t*>(ps_malloc(static_cast<size_t>(kW) * kH));
   detector = new eye::PupilDetector(work, kW, kH);
   model = new eye::EyeModel(kFocalPx, kW, kH);
@@ -313,3 +316,5 @@ void loop() {
     n += snprintf(buf + n, sizeof(buf) - n, " g1x=%.1f g1y=%.1f g2x=%.1f g2y=%.1f", gl[0].x, gl[0].y, gl[1].x, gl[1].y);
   Serial.println(buf);
 }
+
+#endif  // EYE_BENCH
