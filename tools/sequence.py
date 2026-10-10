@@ -30,6 +30,14 @@ def make_sequence(seconds: float = 60.0, seed: int = 0, slip_mm=(1.0, -1.5, 1.0)
     for i, (y, p) in enumerate(CALIB_GRID):
         for k in range(int(1.2 * FPS)):
             frames.append(Frame(EyeState(y, p, pr), "calib", i, k >= int(0.4 * FPS), zero))
+    # lid calibration prompts: eyes open, squint, closed - looking around slowly each time
+    for st_open, st_sq, label, secs in ((1.0, 0.0, "open", 4.0), (0.5, 0.7, "squint", 3.0),
+                                       (0.0, 0.0, "closed", 2.0)):
+        y0, p0 = rng.uniform(-15, 15), rng.uniform(-10, 10)
+        for k in range(int(secs * FPS)):
+            tt = k / FPS
+            st = EyeState(y0 + 12 * np.sin(1.3 * tt), p0 + 8 * np.sin(0.9 * tt + 1), pr, st_open, st_sq)
+            frames.append(Frame(st, "lidcal_" + label, -1, k >= 5, zero))
     # free viewing
     n = int(seconds * FPS)
     yaw, pitch = 0.0, 0.0

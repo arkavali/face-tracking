@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from eyemodel import Calib, EyeModel, yaw_pitch
-from pupil import PupilDetector, find_glints
+from pupil import PupilDetector, PupilGate, find_glints
 
 ROOT = Path(__file__).resolve().parent.parent
 SEQ = ROOT / "out" / "seq"
@@ -33,22 +33,27 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
     camR, f = d["cam_R"], float(d["f"])
     h, w = imgs.shape[1:]
     det = PupilDetector()
+    gate = PupilGate()
     model = EyeModel(f, w, h)
     free = [i for i, g in enumerate(gts) if g["phase"] == "free"]
     t0 = time.perf_counter()
     for i in free[: int(warmup_s * 25)]:       # look around before calibrating
         e = det.detect(imgs[i])
-        if e is not None:
+        if gate(e):
             model.update(e)
     rows = []
     for i, g in enumerate(gts):
         e = det.detect(imgs[i])
+        raw = e is not None
+        if not gate(e):
+            e = None
         r = dict(i=i, yaw=g["yaw"], pitch=g["pitch"], open=g["openness"], squint=g["squint"],
                  phase=g["phase"], target=g["target"], settled=g["settled"], slip=g["slip"],
-                 vis=g["vis_px"] / max(g["full_px"], 1e-9) if g["full_px"] > 0 else 0.0, det=e is not None)
+                 vis=g["vis_px"] / max(g["full_px"], 1e-9) if g["full_px"] > 0 else 0.0, det=e is not None,
+                 det_raw=raw)
         if e is not None:
             model.update(e)
-            r.update(cx=e.cx, cy=e.cy, a=e.a, b=e.b, support=e.support)
+            r.update(cx=e.cx, cy=e.cy, a=e.a, b=e.b, support=e.support, contrast=e.contrast, top_vis=e.top_vis)
             gl = find_glints(imgs[i], e)
             r["n_glints"] = len(gl)
             if len(gl) >= 2:     # pupil minus the mean of the two nearest glints
@@ -64,6 +69,11 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
             r["R"] = model.R
         r["eye_c"] = g["eye_c"]
         rows.append(r)
+    # eyelid opening v1: no pupil -> closed; pupil partly under the upper lid -> its visible
+    # share of the upward extent. The patch regressor (lids.py) did not generalise past the
+    # prompts on the simulated lids; revisit on real IR footage.
+    for r in rows:
+        r["open_est"] = r.get("top_vis", 1.0) if r["det"] else 0.0
     ms = (time.perf_counter() - t0) / (len(gts) + len(free[: int(warmup_s * 25)])) * 1000
 
     # calibration fits (settled calibration frames with a detection)
@@ -76,7 +86,7 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
     calg = [r for r in cal if "gx" in r]
     cal_glint = Calib().fit([[r["gx"], r["gy"]] for r in calg], [[r["yaw"], r["pitch"]] for r in calg])         if len(calg) >= 30 else None
     for r in rows:
-        if cal_glint is not None and "gx" in r:
+        if cal_glint is not None and "gx" in r and r["det"]:
             r["g_yaw"], r["g_pitch"] = cal_glint([[r["gx"], r["gy"]]])[0]
         if r["det"]:
             r["p_yaw"], r["p_pitch"] = cal_pupil([[r["cx"], r["cy"]]])[0]
@@ -97,6 +107,16 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
     res["detect_open"] = float(np.mean([r["det"] for r in open_rows]))
     res["detect_squint"] = float(np.mean([r["det"] for r in free_rows if r["squint"] > 0.5]))
     res["false_in_blink"] = float(np.mean([r["det"] for r in free_rows if r["open"] <= 0.1]))
+    oe = [(r["open"], r["open_est"]) for r in free_rows if "open_est" in r]
+    if oe:
+        o = np.array(oe)
+        res["open_corr"] = float(np.corrcoef(o[:, 0], o[:, 1])[0, 1])
+        res["open_mae"] = float(np.mean(np.abs(o[:, 0] - o[:, 1])))
+        res["blink_caught"] = float(np.mean(o[o[:, 0] <= 0.1, 1] < 0.3))
+        res["open_false_blink"] = float(np.mean(o[o[:, 0] >= 0.9, 1] < 0.3))
+        sq = [r["open_est"] for r in free_rows if r["squint"] > 0.5 and "open_est" in r]
+        res["squint_est_mean"] = float(np.mean(sq)) if sq else None
+    res["false_in_blink_raw"] = float(np.mean([r["det_raw"] for r in free_rows if r["open"] <= 0.1]))
     pe = [r["pc_err"] for r in open_rows if "pc_err" in r and r["vis"] > 0.95]
     res["pupil_px_err_med"] = float(np.median(pe)) if pe else None
     for key, rs in sets.items():

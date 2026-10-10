@@ -46,6 +46,8 @@ class Ellipse:
     angle: float                  # rad, major axis direction
     support: float                # inlier fraction of the rays
     n: int
+    contrast: float = 0.0         # ring around the ellipse minus the pupil level (grey levels)
+    top_vis: float = 1.0          # visible part of the pupil's upward extent (1 = lid clear of it)
 
     @property
     def minor_dir(self):
@@ -245,7 +247,24 @@ class PupilDetector:
         ok = (xx < img.shape[1]) & (yy < img.shape[0])
         if not ok.any() or img[yy[ok], xx[ok]].mean() - level > p.max_inside:
             return None
-        return Ellipse(cx, cy, a, b, ang, float(inl.sum()) / p.rays, int(inl.sum()))
+        # ring just outside the pupil (iris): a real pupil is much darker than its ring
+        t = np.linspace(0, 2 * np.pi, 16, endpoint=False)
+        ca, sa = np.cos(ang), np.sin(ang)
+        u, v = 1.6 * a * np.cos(t), 1.6 * b * np.sin(t)
+        ring = _bilinear(img, cx + u * ca - v * sa, cy + u * sa + v * ca)
+        # upper lid over the pupil: along rays pointing up (+-35 deg), edge distance from the
+        # centre relative to the ellipse's own extent in that direction
+        d = pts - [cx, cy]
+        up = np.degrees(np.arctan2(-d[:, 1], d[:, 0]))
+        sel = np.abs(up - 90) < 35
+        top = 1.0
+        if sel.sum() >= 2:
+            u = d[sel, 0] * ca + d[sel, 1] * sa
+            v = -d[sel, 0] * sa + d[sel, 1] * ca
+            rr = np.hypot(u / a, v / b)          # 1 on the ellipse, < 1 inside it
+            top = float(np.clip(np.median(rr), 0, 1))
+        return Ellipse(cx, cy, a, b, ang, float(inl.sum()) / p.rays, int(inl.sum()),
+                       float(np.median(ring) - level), top)
 
 
 def find_glints(img: np.ndarray, e: Ellipse, level: int = 230, reach: float = 3.0, max_n: int = 4):
@@ -278,3 +297,25 @@ def find_glints(img: np.ndarray, e: Ellipse, level: int = 230, reach: float = 3.
             out.append((p[:, 1].mean() + x0, p[:, 0].mean() + y0, len(px)))
     out.sort(key=lambda g: np.hypot(g[0] - e.cx, g[1] - e.cy))
     return out[:max_n]
+
+
+class PupilGate:
+    """Rejects pupils that are much weaker than the recent accepted ones (lash clumps and
+    the dark slit of a closed eye): ring contrast below a share of the running median, or
+    too few rays on the ellipse."""
+
+    def __init__(self, contrast_share: float = 0.45, min_support: float = 0.55, n: int = 100):
+        self.share, self.min_support = contrast_share, min_support
+        self.hist = []
+        self.n = n
+
+    def __call__(self, e: Ellipse | None) -> bool:
+        if e is None or e.support < self.min_support:
+            return False
+        ref = float(np.median(self.hist)) if len(self.hist) >= 10 else 0.0
+        if e.contrast < self.share * ref:
+            return False
+        self.hist.append(e.contrast)
+        if len(self.hist) > self.n:
+            self.hist.pop(0)
+        return True

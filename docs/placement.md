@@ -33,9 +33,21 @@ Findings
    (2.3-2.7 deg after slip), and the eye-sphere model halves the slip error but is noisy
    (5-9 deg). From below, LEDs under the mirror give no usable glints at all (the
    reflection lands behind the lower lid); LEDs at the top corners of the frame do.
-4. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
-   closed eye in the through view (blink false positives 0.56-0.76); glint matching
-   breaks with narrow lids; blink / squint values are not estimated yet.
+4. **Blink / squint (update, same day).** v1: no accepted pupil = closed; the pupil's
+   visible share under the upper lid = partial opening. A gate (ring contrast >= 0.45 x
+   the running median, >= 55% of rays on the ellipse) removed the lash-clump "pupils" on
+   closed eyes in the through view (0.67 -> 0.10 of closed frames). Blinks are caught in
+   80-100% of closed frames everywhere, with 3-9% false blinks on open eyes (21-41% for
+   the steep / narrow views from below). Squint is only visible this way from below
+   (the lid covers the pupil); from the front the pupil stays clear, so the through view
+   needs a lid-edge measure. A ridge regressor on a raw eye patch (`lids.py`) did not
+   generalise beyond the three calibration prompts on the simulated lids; lid features
+   will be designed on real IR footage. The eye-sphere model works poorly in the
+   frontal through view (pupil ellipses are nearly round, minor axes ill-defined), so
+   there glints are the slip fix, not the sphere.
+5. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
+   closed eye (fixed by the gate, see 4); glint matching breaks with narrow lids (wrong
+   pair picked); squint from the front; port to C++.
 
 The user's phone clips are visible light: pupil and iris are equally dark there, so they
 only check geometry (lids, view angle), not the detector (23% detections on the clip

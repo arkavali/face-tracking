@@ -1,0 +1,10 @@
+median gaze err deg before/after slip (1.8 mm + 2 deg); det=pupil found on open eye; blink caught / false blink on open eye; squint est (gt 0.55)
+under_steep          det 0.79 sq 0.40 | blink 1.00/0.21 sq_est 0.40 | pupil_cal  3.4/16.1  glint_cal  6.0/10.6  model_cal  4.5/15.5 | px/deg 1.45 0.70
+under                det 0.94 sq 0.64 | blink 1.00/0.06 sq_est 0.64 | pupil_cal  2.4/12.9  glint_cal 13.3/14.6  model_cal  3.1/ 6.1 | px/deg 1.28 0.74
+under_ledtop         det 0.92 sq 0.58 | blink 1.00/0.09 sq_est 0.55 | pupil_cal  3.1/12.5  glint_cal  9.6/ 7.5  model_cal  4.2/ 4.6 | px/deg 1.22 0.75
+under_ledtop_narrow  det 0.59 sq 0.17 | blink 1.00/0.41 sq_est 0.17 | pupil_cal  3.7/15.8  glint_cal 10.8/17.4  model_cal  7.7/ 7.2 | px/deg 1.16 0.60
+under_far            det 0.97 sq 0.65 | blink 1.00/0.03 sq_est 0.65 | pupil_cal  2.1/10.2  glint_cal 15.7/14.6  model_cal  4.3/ 7.4 | px/deg 1.14 0.76
+thru                 det 0.89 sq 0.98 | blink 1.00/0.11 sq_est 0.96 | pupil_cal  0.8/ 4.9  glint_cal  6.3/ 6.0  model_cal 20.8/15.1 | px/deg 1.05 0.94
+thru_ledside         det 0.96 sq 0.98 | blink 0.90/0.04 sq_est 0.97 | pupil_cal  0.9/ 4.9  glint_cal  3.6/ 2.8  model_cal 12.9/ 9.0 | px/deg 1.02 0.96
+thru_ledside_narrow  det 0.95 sq 0.86 | blink 0.80/0.05 sq_est 0.84 | pupil_cal  1.9/ 6.2  glint_cal 11.7/11.0  model_cal 16.7/10.0 | px/deg 0.99 0.84
+thru_ledbehind       det 0.96 sq 0.88 | blink 1.00/0.04 sq_est 0.86 | pupil_cal  1.2/ 5.0  glint_cal  3.3/ 2.5  model_cal 12.0/13.1 | px/deg 1.05 0.94
