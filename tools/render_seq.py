@@ -18,8 +18,11 @@ from sequence import make_sequence
 OUT = Path(__file__).resolve().parent.parent / "out" / "seq"
 
 
-def _setup(name, screen, narrow):
+def _setup(name, screen, narrow, glasses=0.0):
     sc, cam, info = make(name, screen)
+    if glasses:
+        from eyesim import Glasses
+        sc.glasses = Glasses(refl=glasses)
     if narrow:
         # closer to the user's phone clips: lower lid at the iris bottom, more upper-lid cover
         sc.lids.up_open, sc.lids.lo_open = 19.0, 10.0
@@ -28,8 +31,8 @@ def _setup(name, screen, narrow):
 
 def chunk(args):
     """Render frames [a, b) of one placement (one worker)."""
-    name, seconds, screen, seed, narrow, a, b = args
-    sc, cam, _ = _setup(name, screen, narrow)
+    name, seconds, screen, seed, narrow, glasses, a, b = args
+    sc, cam, _ = _setup(name, screen, narrow, glasses)
     r = Renderer(sc, cam)
     r.noise_rng = np.random.default_rng(1000 + seed * 100000 + a)   # independent sensor noise per chunk
     frames = make_sequence(seconds, seed)[a:b]
@@ -55,10 +58,12 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--narrow", action="store_true", help="narrower lid opening")
     ap.add_argument("--workers", type=int, default=30)
+    ap.add_argument("--glasses", type=float, default=0.0,
+                    help="spectacle lens with this reflectance per surface (0 = none; 0.04 uncoated)")
     a = ap.parse_args()
     n_frames = len(make_sequence(a.seconds, a.seed))
     step = 40
-    jobs = [(n, a.seconds, a.screen, a.seed, a.narrow, k, min(k + step, n_frames))
+    jobs = [(n, a.seconds, a.screen, a.seed, a.narrow, a.glasses, k, min(k + step, n_frames))
             for n in a.names for k in range(0, n_frames, step)]
     parts = {n: {} for n in a.names}
     with Pool(a.workers) as p:
@@ -68,7 +73,7 @@ def main():
                 ks = sorted(parts[name])
                 imgs = [im for k2 in ks for im in parts[name][k2][0]]
                 gts = [g for k2 in ks for g in parts[name][k2][1]]
-                _, cam, info = _setup(name, a.screen, a.narrow)
+                _, cam, info = _setup(name, a.screen, a.narrow, a.glasses)
                 OUT.mkdir(parents=True, exist_ok=True)
                 out = OUT / f"{name}{a.tag}.npz"
                 np.savez_compressed(out, imgs=np.array(imgs), gt=json.dumps(gts), cam_R=cam.R,

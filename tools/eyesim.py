@@ -21,6 +21,11 @@ Model (textbook values, Le Grand / Gullstrand simplified):
   solved analytically per LED; optional reflection of the AR screen (visible light, seen
   only when the lens has no IR-pass filter); optional semi-transparent combiner plate
   between eye and camera (transmission, LED ghost reflection, veil).
+* glasses (optional): a thin spectacle lens ~12 mm in front of the cornea with a frame
+  rim; rays through it are bent by the lens power (thin-lens deflection), and both lens
+  surfaces mirror the LEDs (meniscus spheres, 4% per uncoated surface). With glasses the
+  corneal glints are traced per pixel too (LEDs as 5 mm discs), so they move with the
+  lens like the rest of the eye.
 * camera: pinhole (OV2640 66 deg diagonal ~ 54.9 deg horizontal at 4:3), defocus blur,
   shot + read noise after an auto-exposure gain.
 """
@@ -200,6 +205,33 @@ class Plate:
 
 
 @dataclass
+class Glasses:
+    """Spectacle lens in front of one eye (eye frame, mm). Thin lens for refraction,
+    two spheres (meniscus, centres on the eye side) for the surface reflections."""
+    center: tuple = (0.0, -1.0, 25.5)   # lens centre: 12 mm in front of the corneal apex
+    tilt_deg: float = 8.0               # pantoscopic tilt: bottom edge closer to the face
+    power_d: float = -2.0               # dioptres (minus = myopia)
+    half_w: float = 25.0
+    half_h: float = 16.0
+    rim_mm: float = 3.0
+    r_front: float = 120.0              # front (camera side) surface radius
+    refl: float = 0.04                  # reflectance per surface (uncoated ~4%, AR coated ~0.5-1%)
+    rim_albedo: float = 0.12
+
+    def frame(self):
+        t = np.radians(self.tilt_deg)
+        nrm = np.array([0.0, -np.sin(t), np.cos(t)])   # towards the camera, top tilted forward
+        up = np.array([0.0, np.cos(t), np.sin(t)])
+        side = np.cross(up, nrm)
+        return np.asarray(self.center, float), nrm, up, side
+
+    def r_back(self):
+        # lensmaker (n = 1.5, thin): P = 0.5 (1/R1 - 1/R2)
+        inv = 1.0 / self.r_front - self.power_d / 1000.0 / 0.5
+        return 1.0 / inv
+
+
+@dataclass
 class Scene:
     lids: Lids = field(default_factory=Lids)
     leds: list = field(default_factory=list)      # [(pos (3,), power)]
@@ -211,6 +243,9 @@ class Scene:
     plate_leds_behind: bool = False                # LEDs on the camera side of the plate
     screen_level: float = 0.0                      # AR screen corneal reflection (0 = IR filter)
     screen_fov: tuple = (40.0, 24.0)               # its angular size (deg), straight ahead
+    glasses: Glasses | None = None
+    led_radius: float = 2.5                        # LED emitter disc (glints traced per pixel)
+    led_radiance: float = 240.0                    # x power; 2.5% corneal reflection saturates
     lash_up: int = 55
     lash_lo: int = 25
     seed: int = 1
@@ -252,7 +287,7 @@ def _trace_eye(o, d, g, pupil_r):
     lab[m & (rr >= R_IRIS)] = SCLERA            # seen through the cornea edge
     n = np.where(m[..., None], g[None, None, :] * np.ones_like(n), n)
     p_shade = np.where(m[..., None], pi, p)
-    return t, lab, n, p_shade, rr, p
+    return t, lab, n, p_shade, rr, p, m
 
 
 def _iris_tex(pi, g, seed):
@@ -311,6 +346,10 @@ class Renderer:
             D, O = self.D, self.O
         sc, g = self.sc, st.g
         H, W = D.shape[:2]
+        lens = None
+        if sc.glasses is not None:
+            lens = self._lens(O, D, cam)
+            O, D = lens["O"], lens["D"]
 
         # surroundings
         t_face = (sc.face_z - O[..., 2]) / np.where(np.abs(D[..., 2]) < 1e-9, -1e-9, D[..., 2])
@@ -326,7 +365,7 @@ class Renderer:
             extra.append(np.where(t0 > 0, t0, np.inf))
 
         # eye composite (also traced without lids for the ground-truth pupil)
-        te, lab_e, n_e, ps_e, rr_e, pe = _trace_eye(O, D, g, st.pupil_r)
+        te, lab_e, n_e, ps_e, rr_e, pe, use_c = _trace_eye(O, D, g, st.pupil_r)
         te = np.where(np.isfinite(te) & (lab_e != NONE), te, np.inf)
 
         # lid test at the first crossing of the skin sphere (or at the cornea if it is in front)
@@ -385,10 +424,21 @@ class Renderer:
             sh = 1 - 0.35 * np.exp(-(up_e - e_e) / 3.0)
             img[eyem] *= np.nan_to_num(np.clip(sh, 0.4, 1), nan=1.0)
         zbuf = np.where(np.isfinite(tmin), tmin, 1e9)
+        spec_ss = None
+        if lens is not None:
+            zbuf = zbuf + lens["t"]                         # distances from the camera again
+            spec_ss, gl_ss = self._corneal_spec(O, D, pe, use_c & (k == 1), st)
 
         # lashes (dark strands with a depth test), drawn at the supersampled resolution
         cover = self._lashes(st, cam, zbuf, H, W)
         img = img * (1 - cover) + cover * ALB_LASH * self._light_pts_mean(p)
+
+        if lens is not None:
+            img = np.where(lens["ap"], img * (1 - 2 * sc.glasses.refl) ** 2, img)
+            img = img + spec_ss * np.where(lens["ap"], (1 - 2 * sc.glasses.refl), 1.0)
+            img = img + lens["spec"]
+            rimv = sc.glasses.rim_albedo * self._light(lens["q"], np.broadcast_to(lens["nrm"], lens["q"].shape))
+            img = np.where(lens["rim"], rimv, img)
 
         # plate: transmission and camera-side light
         if sc.plate is not None:
@@ -405,7 +455,7 @@ class Renderer:
         # glints (corneal reflections of the LEDs and of the AR screen)
         spec = np.zeros((cam.h, cam.w), np.float32)
         gl_px = []
-        for pos, pw in sc.leds:
+        for pos, pw in (sc.leds if lens is None else []):
             q = self._glint(np.asarray(pos, float), cam, st, zbuf)
             if q is not None:
                 gl_px.append(q[0])
@@ -422,6 +472,11 @@ class Renderer:
                 if z > 0:
                     self._splat(img, uv, 2.5, 3.0 * pl.R * pw)
 
+        if lens is not None:                    # ground-truth glints: centroids of the traced ones
+            for m in gl_ss:
+                if m.any():
+                    ys, xs = np.nonzero(m)
+                    gl_px.append(((xs.mean() + 0.5) / self.ss - 0.5, (ys.mean() + 0.5) / self.ss - 0.5))
         out = look.finish(img, self.noise_rng)
         gt = dict(yaw=st.yaw, pitch=st.pitch, open=sc.lids.aperture_deg(st), pupil_r=st.pupil_r,
                   vis_px=float(vis_pupil.sum()), full_px=float(full_pupil.sum()),
@@ -438,6 +493,58 @@ class Renderer:
         gt["eye_c"] = tuple(cam.project(np.zeros(3))[0])
         gt["pupil_3d"] = tuple(cam.project(g * Z_IRIS)[0])
         return out, gt
+
+    def _lens(self, O, D, cam):
+        """Rays through the spectacle lens: exit point/direction, rim mask, LED reflections."""
+        gl = self.sc.glasses
+        c, nrm, up, side = gl.frame()
+        O = np.broadcast_to(O, D.shape).astype(float)
+        dn = np.einsum("...k,k->...", D, nrm)
+        t = np.einsum("...k,k->...", c - O, nrm) / np.where(np.abs(dn) < 1e-9, -1e-9, dn)
+        q = O + t[..., None] * D
+        sv = np.einsum("...k,k->...", q - c, side)
+        su = np.einsum("...k,k->...", q - c, up)
+        e_in = (sv / gl.half_w) ** 2 + (su / gl.half_h) ** 2
+        e_out = (sv / (gl.half_w + gl.rim_mm)) ** 2 + (su / (gl.half_h + gl.rim_mm)) ** 2
+        hit = (t > 0) & (dn < 0)
+        ap = hit & (e_in < 1)
+        rim = hit & ~ap & (e_out < 1)
+        # thin lens: transverse slopes change by -P * offset
+        P = gl.power_d / 1000.0
+        a = -dn
+        slv = np.einsum("...k,k->...", D, side) / np.maximum(a, 1e-9) - P * sv
+        slu = np.einsum("...k,k->...", D, up) / np.maximum(a, 1e-9) - P * su
+        Dn = -nrm[None, None, :] + slv[..., None] * side + slu[..., None] * up
+        Dn /= np.linalg.norm(Dn, axis=-1, keepdims=True)
+        D2 = np.where(ap[..., None], Dn, D)
+        O2 = np.where(ap[..., None], q, O)
+        tt = np.where(ap, t, 0.0)
+        # surface reflections of the LEDs (front and back sphere normals at the plane hit)
+        spec = np.zeros(D.shape[:2])
+        for rc in (gl.r_front, gl.r_back()):
+            cc = c - nrm * rc
+            n = (q - cc) / abs(rc)
+            if rc < 0:
+                n = -n
+            r = D - 2 * np.einsum("...k,...k->...", D, n)[..., None] * n
+            for pos, pw in self.sc.leds:
+                t0, _ = _sphere_hit(q, r, np.asarray(pos, float), self.sc.led_radius)
+                spec += np.where(ap & (t0 > 0), gl.refl * self.sc.led_radiance * pw, 0.0)
+        return dict(O=O2, D=D2, t=tt, ap=ap, rim=rim, q=q, nrm=nrm, spec=spec)
+
+    def _corneal_spec(self, O, D, pe, vis, st):
+        """Per-pixel corneal reflection of the LED discs (2.5%), and one mask per LED."""
+        cc = st.g * D_CORNEA
+        n = (pe - cc) / R_CORNEA
+        r = D - 2 * np.einsum("...k,...k->...", D, n)[..., None] * n
+        spec = np.zeros(D.shape[:2])
+        masks = []
+        for pos, pw in self.sc.leds:
+            t0, _ = _sphere_hit(pe, r, np.asarray(pos, float), self.sc.led_radius)
+            m = vis & (t0 > 0)
+            spec += np.where(m, 0.025 * self.sc.led_radiance * pw, 0.0)
+            masks.append(m)
+        return spec, masks
 
     def _light_pts_mean(self, p):
         return self._light(p, np.broadcast_to(np.array([0.0, 0.0, 1.0]), p.shape))

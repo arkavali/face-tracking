@@ -50,7 +50,19 @@ Findings
    left->right spacing (`GlintPairer`). Through the mirror with LEDs on the frame sides
    the pupil-glint calibration now gives **1.6 deg before / 1.4 deg after the slip**
    (p90 3.7); with narrow lids 5.8 / 5.1 (was 11.7). Full table: `summary_sim.txt`.
-6. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
+6. **Glasses (the user will wear them; -2 D uncoated lens 12 mm from the cornea, frame
+   rim, both lens surfaces mirror the LEDs).** Each LED shows up twice more as a big
+   saturated disc. Where it lands depends only on where the LED sits
+   (`led_glasses.txt`): LEDs next to the camera behind the mirror put the reflection
+   right on the pupil (5-14 px away) and detection collapses to 62%; LEDs on the mirror
+   frame's sides or top corners keep it 65-120 px away. Through the mirror with side
+   LEDs, tracking with glasses holds: pupil found 95%, blinks 97% caught, pupil-glint
+   gaze 5.9 / 5.2 deg with narrow lids (same as without glasses); squint detection drops
+   to 64% (`summary_glasses.txt`). From below, the frame's bottom rim crosses the view
+   (as in the user's clip) and detection falls to 64%. An anti-reflection coating only
+   dims the reflections (still saturated in the sim at 0.8% per surface). Best LED spots
+   with glasses: top corners of the mirror frame, or the sides set wide (+-32 mm).
+7. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
    closed eye (fixed by the gate, see 4); squint from the front (needs real IR footage);
    glint pairs with narrow lids still sometimes wrong.
 

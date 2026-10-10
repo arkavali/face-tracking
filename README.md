@@ -50,7 +50,8 @@ mirror (noisy frames), 8 px from below.
 
 | Script | What it does |
 |---|---|
-| `eyesim.py` | Ray-traced near-IR eye: refracting cornea, iris/pupil, lids that follow the gaze, blink/squint, lashes, LED glints, AR screen reflection, semi-transparent combiner plate, sensor noise |
+| `eyesim.py` | Ray-traced near-IR eye: refracting cornea, iris/pupil, lids that follow the gaze, blink/squint, lashes, LED glints, AR screen reflection, semi-transparent combiner plate, glasses (lens power, surface reflections, rim), sensor noise |
+| `led_glasses.py` | Where LED reflections in a spectacle lens land, per LED position |
 | `placements.py` | Camera/LED placements for one eye (under the AR mirror at several distances, through the combiner) |
 | `preview.py` | Contact sheet: placements x eye states (`out/preview.png`) |
 | `sequence.py` | 25 fps sequences: 9-point calibration, fixations/saccades/pursuit, blinks, squints, pupil size drift, mask slip |
@@ -83,6 +84,7 @@ $PY evaluate.py
   the upper lid fold hangs over the margin, so lid occlusion from below is probably
   underestimated.
 - Reflectances at 850 nm are guesses; no cast shadows except a crude lid shadow, no tear
-  film, no motion blur (saccades span 1-2 frames), no glasses yet.
+  film, no motion blur (saccades span 1-2 frames).
+- Glasses are a thin lens; lashes are drawn without its refraction.
 - The AR combiner pose is estimated from brow_tracker's holder numbers, not from the CAD.
 - Noise is relative: the through-mirror camera gets 1/T less light at the same LED power.
