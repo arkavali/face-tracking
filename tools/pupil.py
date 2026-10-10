@@ -107,6 +107,9 @@ def starburst(img: np.ndarray, seed, level: float, p: PupilParams):
                     continue
             if v[j] - v[j - 2] > p.grad and v[j] > level + p.above_seed:
                 # sub-pixel: position of the steepest step around j
+                if j + 2 > len(v):
+                    pts.append((seed[0] + np.cos(th[i]) * r[j], seed[1] + np.sin(th[i]) * r[j]))
+                    break
                 g = v[j - 1: j + 2] - v[j - 3: j]
                 k = int(np.argmax(g)) - 1  # -1..1 around j - 1
                 rr = r[j - 1 + k] if 0 <= j - 1 + k < len(r) else r[j]
@@ -243,3 +246,35 @@ class PupilDetector:
         if not ok.any() or img[yy[ok], xx[ok]].mean() - level > p.max_inside:
             return None
         return Ellipse(cx, cy, a, b, ang, float(inl.sum()) / p.rays, int(inl.sum()))
+
+
+def find_glints(img: np.ndarray, e: Ellipse, level: int = 230, reach: float = 3.0, max_n: int = 4):
+    """Centroids of small saturated blobs within reach * major axis of the pupil centre."""
+    h, w = img.shape
+    r = int(reach * e.a) + 2
+    x0, x1 = max(int(e.cx) - r, 0), min(int(e.cx) + r + 1, w)
+    y0, y1 = max(int(e.cy) - r, 0), min(int(e.cy) + r + 1, h)
+    m = img[y0:y1, x0:x1] >= level
+    if not m.any():
+        return []
+    # tiny connected components (4-neighbour flood fill, fine for a handful of pixels)
+    seen = np.zeros_like(m)
+    out = []
+    for yy, xx in zip(*np.nonzero(m)):
+        if seen[yy, xx]:
+            continue
+        stack, px = [(yy, xx)], []
+        seen[yy, xx] = True
+        while stack:
+            a, b = stack.pop()
+            px.append((a, b))
+            for da, db in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                c, d = a + da, b + db
+                if 0 <= c < m.shape[0] and 0 <= d < m.shape[1] and m[c, d] and not seen[c, d]:
+                    seen[c, d] = True
+                    stack.append((c, d))
+        if len(px) <= 40:
+            p = np.array(px, float)
+            out.append((p[:, 1].mean() + x0, p[:, 0].mean() + y0, len(px)))
+    out.sort(key=lambda g: np.hypot(g[0] - e.cx, g[1] - e.cy))
+    return out[:max_n]

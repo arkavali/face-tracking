@@ -19,8 +19,11 @@ OUT = Path(__file__).resolve().parent.parent / "out" / "seq"
 
 
 def job(args):
-    name, seconds, screen, tag, seed = args
+    name, seconds, screen, tag, seed, narrow = args
     sc, cam, info = make(name, screen)
+    if narrow:
+        # closer to the user's phone clips: lower lid at the iris bottom, more upper-lid cover
+        sc.lids.up_open, sc.lids.lo_open = 19.0, 10.0
     r = Renderer(sc, cam)
     frames = make_sequence(seconds, seed)
     look = Look()
@@ -47,9 +50,10 @@ def main():
     ap.add_argument("--screen", type=float, default=0.0)
     ap.add_argument("--tag", default="")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--narrow", action="store_true", help="narrower lid opening")
     a = ap.parse_args()
     with Pool(len(a.names)) as p:
-        for r in p.imap_unordered(job, [(n, a.seconds, a.screen, a.tag, a.seed) for n in a.names]):
+        for r in p.imap_unordered(job, [(n, a.seconds, a.screen, a.tag, a.seed, a.narrow) for n in a.names]):
             print(r, flush=True)
 
 

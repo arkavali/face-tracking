@@ -36,6 +36,9 @@ def make(name: str, screen_level: float = 0.0, seed: int = 1):
     elif name == "under":              # under the frame bottom edge, ~40 deg up
         cam = Camera.looking_at([2.0, -27.0, 42.0], _target())
         sc.leds = [((-12.0, -25.0, 38.0), 0.5), ((14.0, -25.0, 38.0), 0.5)]
+    elif name == "under_ledtop":       # "under", LEDs at the top corners of the mirror frame
+        cam = Camera.looking_at([2.0, -27.0, 42.0], _target())
+        sc.leds = [((-24.0, 22.0, 45.0), 0.5), ((24.0, 22.0, 45.0), 0.5)]
     elif name == "under_far":          # at the plate, bottom edge
         cam = Camera.looking_at([2.0, -26.0, 50.0], _target())
         sc.leds = [((-12.0, -25.0, 46.0), 0.5), ((14.0, -25.0, 46.0), 0.5)]
@@ -44,7 +47,9 @@ def make(name: str, screen_level: float = 0.0, seed: int = 1):
         # the camera behind it (light passes the plate twice + a ghost of the LED)
         cam = Camera.looking_at([4.0, -8.0, 62.0], _target())
         sc.plate = Plate(np.array([0.0, 0.0, PLATE_Z]), np.array([0.0, 0.0, 1.0]))
-        if name == "thru_ledbehind":
+        if name == "thru_ledside":     # LEDs on the frame sides at eye level, eye side of the plate
+            sc.leds = [((-26.0, 0.0, 45.0), 0.5), ((26.0, 0.0, 45.0), 0.5)]
+        elif name == "thru_ledbehind":
             sc.plate_leds_behind = True
             sc.leds = [((-8.0, -14.0, 60.0), 0.5), ((14.0, -14.0, 60.0), 0.5)]
         else:
@@ -57,4 +62,4 @@ def make(name: str, screen_level: float = 0.0, seed: int = 1):
     return sc, cam, info
 
 
-NAMES = ["under_steep", "under", "under_far", "thru", "thru_ledbehind"]
+NAMES = ["under_steep", "under", "under_ledtop", "under_far", "thru", "thru_ledside", "thru_ledbehind"]

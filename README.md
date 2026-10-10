@@ -22,7 +22,11 @@ The boards are not here yet, so everything so far runs on a synthetic eye.
 | `render_seq.py` | Render a sequence per placement to `out/seq/*.npz` (parallel) |
 | `pupil.py` | Pupil detector (seed, starburst, RANSAC ellipse) written for an ESP port |
 | `eyemodel.py` | Incremental eye-sphere model, gaze vector, polynomial calibration |
-| `evaluate.py` | Detector + model on rendered sequences vs ground truth (`out/eval/`) |
+| `evaluate.py` | Detector + model + calibrations (pupil, pupil-glint, pupil-centre, model) on rendered sequences vs ground truth (`out/eval/`) |
+| `own_video.py` | Detector on the user's phone clips (visible light, geometry check only) |
+| `dbg_detect.py` | Debug sheet: edge points and ellipses on the preview states |
+
+Placement comparison: [docs/placement.md](docs/placement.md).
 
 Setup: uses `../brow_tracker/.venv` (Python 3.9, numpy, opencv-python, matplotlib).
 

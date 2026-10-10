@@ -6,7 +6,7 @@
 * The sums decay slowly (forgetting factor), so the model keeps re-estimating: that is
   what follows mask slip. JEOresearch freezes the model on a key press instead.
 * Radius (px): the pupil centre sits R * sin(theta) from the centre, where
-  cos(theta) = minor / major; R is a running median of |p - c| / sin(theta).
+  cos(theta) = minor / major; R is a decaying least-squares fit of |p - c|^2 = R^2 sin^2.
 * Gaze: (p - c) / R gives the gaze components across the line of sight to the eye;
   the third component points towards the camera. Rotated to the camera frame by the
   direction of the ray through c, then to the head frame by the camera's mounting pose.
@@ -32,6 +32,8 @@ class EyeModel:
         self.c = None
         self.rs = deque(maxlen=r_buffer)
         self.R = None
+        self.r_num = 0.0
+        self.r_den = 0.0
 
     def update(self, e) -> None:
         ecc = 1.0 - e.b / e.a
@@ -48,11 +50,17 @@ class EyeModel:
         if self.wsum > 3.0 and np.linalg.cond(self.A) < 1e3:
             self.c = np.linalg.solve(self.A, self.bv)
         if self.c is not None:
-            s = np.sqrt(max(1 - (e.b / e.a) ** 2, 0))
-            if s > 0.35:
-                self.rs.append(np.hypot(e.cx - self.c[0], e.cy - self.c[1]) / s)
-                if len(self.rs) >= 20:
-                    self.R = float(np.median(self.rs))
+            # |p - c|^2 = R^2 sin^2(theta): decaying least squares over frames with a clear tilt
+            s2 = max(1 - (e.b / e.a) ** 2, 0)
+            self.r_num *= self.decay
+            self.r_den *= self.decay
+            if s2 > 0.25:
+                d2 = (e.cx - self.c[0]) ** 2 + (e.cy - self.c[1]) ** 2
+                self.r_num += d2 * s2
+                self.r_den += s2 * s2
+                self.rs.append(1)
+            if len(self.rs) >= 20 and self.r_den > 0:
+                self.R = float(np.sqrt(self.r_num / self.r_den))
 
     @property
     def ready(self) -> bool:

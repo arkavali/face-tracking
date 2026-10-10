@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from eyemodel import Calib, EyeModel, yaw_pitch
-from pupil import PupilDetector
+from pupil import PupilDetector, find_glints
 
 ROOT = Path(__file__).resolve().parent.parent
 SEQ = ROOT / "out" / "seq"
@@ -49,6 +49,11 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
         if e is not None:
             model.update(e)
             r.update(cx=e.cx, cy=e.cy, a=e.a, b=e.b, support=e.support)
+            gl = find_glints(imgs[i], e)
+            r["n_glints"] = len(gl)
+            if len(gl) >= 2:     # pupil minus the mean of the two nearest glints
+                r["gx"] = e.cx - (gl[0][0] + gl[1][0]) / 2
+                r["gy"] = e.cy - (gl[0][1] + gl[1][1]) / 2
             if "pc_vis" in g:
                 r["pc_err"] = float(np.hypot(e.cx - g["pc_vis"][0], e.cy - g["pc_vis"][1]))
             gc = model.gaze_cam(e)
@@ -66,11 +71,19 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
     Y = np.array([[r["yaw"], r["pitch"]] for r in cal])
     cal_pupil = Calib().fit([[r["cx"], r["cy"]] for r in cal], Y)
     cal_model = Calib(order=1).fit([[r["m_yaw"], r["m_pitch"]] for r in cal], Y)
+    # pupil relative to the model's eyeball centre: the centre follows the camera when the mask slips
+    cal_rel = Calib().fit([[r["cx"] - r["c"][0], r["cy"] - r["c"][1]] for r in cal], Y)
+    calg = [r for r in cal if "gx" in r]
+    cal_glint = Calib().fit([[r["gx"], r["gy"]] for r in calg], [[r["yaw"], r["pitch"]] for r in calg])         if len(calg) >= 30 else None
     for r in rows:
+        if cal_glint is not None and "gx" in r:
+            r["g_yaw"], r["g_pitch"] = cal_glint([[r["gx"], r["gy"]]])[0]
         if r["det"]:
             r["p_yaw"], r["p_pitch"] = cal_pupil([[r["cx"], r["cy"]]])[0]
             if "m_yaw" in r:
                 r["mc_yaw"], r["mc_pitch"] = cal_model([[r["m_yaw"], r["m_pitch"]]])[0]
+            if "c" in r:
+                r["r_yaw"], r["r_pitch"] = cal_rel([[r["cx"] - r["c"][0], r["cy"] - r["c"][1]]])[0]
 
     free_rows = [r for r in rows if r["phase"] == "free"]
     slip_max = max(r["slip"] for r in free_rows)
@@ -88,7 +101,8 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
     res["pupil_px_err_med"] = float(np.median(pe)) if pe else None
     for key, rs in sets.items():
         for meth, (ky, kp) in {"model_raw": ("m_yaw", "m_pitch"), "model_cal": ("mc_yaw", "mc_pitch"),
-                               "pupil_cal": ("p_yaw", "p_pitch")}.items():
+                               "pupil_cal": ("p_yaw", "p_pitch"), "rel_cal": ("r_yaw", "r_pitch"),
+                               "glint_cal": ("g_yaw", "g_pitch")}.items():
             rr = [r for r in rs if ky in r]
             if not rr:
                 continue
@@ -97,6 +111,7 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
             res[f"{key}/{meth}/med"] = float(np.median(e))
             res[f"{key}/{meth}/p90"] = float(np.percentile(e, 90))
         res[f"{key}/detect"] = float(np.mean([r["det"] for r in rs]))
+        res[f"{key}/glint2"] = float(np.mean([r.get("n_glints", 0) >= 2 for r in rs]))
     # model centre vs the true projection of the eyeball centre
     last = [r for r in rows if "c" in r]
     if last:
