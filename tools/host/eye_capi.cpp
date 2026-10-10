@@ -10,6 +10,7 @@ struct Ctx {
   uint16_t* work;
   eye::PupilDetector* det;
   eye::PupilGate gate;
+  eye::GlintPairer pairer;
   eye::EyeModel* model;
 };
 
@@ -30,7 +31,7 @@ __declspec(dllexport) void eye_free(void* p) {
 }
 
 // out: found, cx, cy, a, b, angle, support, contrast, top_vis, gated, model_ready, mcx, mcy,
-//      R, gx, gy, gz, n_glints, then 4 x (glint x, y)
+//      R, gx, gy, gz, n_glints, then the LED glint pair (left x, y, right x, y; 0 if none)
 __declspec(dllexport) void eye_update(void* p, const uint8_t* img, int w, int h, double* out) {
   auto* c = static_cast<Ctx*>(p);
   for (int i = 0; i < 26; ++i) out[i] = 0;
@@ -60,9 +61,12 @@ __declspec(dllexport) void eye_update(void* p, const uint8_t* img, int w, int h,
     eye::Glint gl[eye::kMaxGlints];
     int n = eye::findGlints(img, w, h, e, gl);
     out[17] = n;
-    for (int i = 0; i < n; ++i) {
-      out[18 + 2 * i] = gl[i].x;
-      out[19 + 2 * i] = gl[i].y;
+    eye::Glint l, r;
+    if (c->pairer(gl, n, &l, &r)) {
+      out[18] = l.x;
+      out[19] = l.y;
+      out[20] = r.x;
+      out[21] = r.y;
     }
   }
   out[10] = c->model->ready();

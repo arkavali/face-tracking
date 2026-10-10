@@ -290,8 +290,13 @@ class PupilDetector:
                        float(np.median(ring) - level), top)
 
 
-def find_glints(img: np.ndarray, e: Ellipse, level: int = 230, reach: float = 3.0, max_n: int = 4):
-    """Centroids of small saturated blobs within reach * major axis of the pupil centre."""
+def find_glints(img: np.ndarray, e: Ellipse, level: int = 230, reach: float = 3.0, max_n: int = 4,
+                isolate: float = 50.0):
+    """Centroids of small saturated blobs within reach * major axis of the pupil centre.
+
+    A corneal glint is an isolated peak: the mean of the 1-px frame around the blob's
+    bounding box (2 px out) must be at least `isolate` grey levels below `level`. Bright
+    sclera / skin noise peaks fail that test."""
     h, w = img.shape
     r = int(reach * e.a) + 2
     x0, x1 = max(int(e.cx) - r, 0), min(int(e.cx) + r + 1, w)
@@ -317,7 +322,12 @@ def find_glints(img: np.ndarray, e: Ellipse, level: int = 230, reach: float = 3.
                     stack.append((c, d))
         if len(px) <= 40:
             p = np.array(px, float)
-            out.append((p[:, 1].mean() + x0, p[:, 0].mean() + y0, len(px)))
+            ya, yb = int(p[:, 0].min()) + y0 - 2, int(p[:, 0].max()) + y0 + 2
+            xa, xb = int(p[:, 1].min()) + x0 - 2, int(p[:, 1].max()) + x0 + 2
+            ring = [img[y, x] for y in range(ya, yb + 1) for x in range(xa, xb + 1)
+                    if (y in (ya, yb) or x in (xa, xb)) and 0 <= y < h and 0 <= x < w]
+            if ring and float(np.mean(ring)) <= level - isolate:
+                out.append((p[:, 1].mean() + x0, p[:, 0].mean() + y0, len(px)))
     out.sort(key=lambda g: np.hypot(g[0] - e.cx, g[1] - e.cy))
     return out[:max_n]
 
@@ -342,3 +352,36 @@ class PupilGate:
         if len(self.hist) > self.n:
             self.hist.pop(0)
         return True
+
+
+class GlintPairer:
+    """Picks the two LED glints among the candidates by their spacing.
+
+    The two LEDs sit left and right of the eye, so their glints keep a nearly constant
+    offset (left -> right) while the eye moves. The first `learn` frames with two or more
+    candidates use the two nearest the pupil and the reference offset is their median;
+    afterwards the pair closest to the reference wins, and none if no pair is within
+    `tol` x the reference length."""
+
+    def __init__(self, learn: int = 50, tol: float = 0.35):
+        self.learn, self.tol = learn, tol
+        self.samples = []
+        self.ref = None
+
+    def __call__(self, gl: list):
+        if len(gl) < 2:
+            return None
+        if self.ref is None:
+            a, b = sorted(gl[:2], key=lambda g: g[0])
+            self.samples.append((b[0] - a[0], b[1] - a[1]))
+            if len(self.samples) >= self.learn:
+                self.ref = np.median(np.array(self.samples), 0)
+            return a, b
+        best, cost = None, self.tol * float(np.hypot(*self.ref))
+        for i in range(len(gl)):
+            for j in range(i + 1, len(gl)):
+                a, b = sorted((gl[i], gl[j]), key=lambda g: g[0])
+                c = float(np.hypot(b[0] - a[0] - self.ref[0], b[1] - a[1] - self.ref[1]))
+                if c < cost:
+                    best, cost = (a, b), c
+        return best

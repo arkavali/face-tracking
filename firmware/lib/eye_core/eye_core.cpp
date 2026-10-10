@@ -554,7 +554,8 @@ bool PupilGate::operator()(const Ellipse* e) {
 
 // ----------------------------------------------------------------------------- glints
 
-int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, int level, real reach) {
+int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, int level, real reach,
+               real isolate) {
   const int r = int(reach * e.a) + 2;
   int x0 = int(e.cx) - r, x1 = int(e.cx) + r + 1, y0 = int(e.cy) - r, y1 = int(e.cy) + r + 1;
   if (x0 < 0) x0 = 0;
@@ -576,6 +577,7 @@ int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, i
       if (seen[yy * bw + xx] || img[(yy + y0) * w + xx + x0] < level) continue;
       int sp = 0, cnt = 0;
       int64_t sxs = 0, sys = 0;
+      int ymin = yy, ymax = yy, xmin = xx, xmax = xx;
       stack[sp++] = yy * bw + xx;
       seen[yy * bw + xx] = 1;
       while (sp) {
@@ -584,6 +586,10 @@ int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, i
         ++cnt;
         sxs += b;
         sys += a;
+        if (a < ymin) ymin = a;
+        if (a > ymax) ymax = a;
+        if (b < xmin) xmin = b;
+        if (b > xmax) xmax = b;
         const int nb[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
         for (auto& d : nb) {
           int c = a + d[0], dd = b + d[1];
@@ -593,8 +599,21 @@ int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, i
           }
         }
       }
-      if (cnt <= 40 && nf < kMaxFound) {
-        Glint g{real(sxs / cnt + x0), real(sys / cnt + y0), cnt};
+      bool isolated = false;
+      if (cnt <= 40) {
+        const int ya = ymin + y0 - 2, yb = ymax + y0 + 2, xa = xmin + x0 - 2, xb = xmax + x0 + 2;
+        int64_t rs = 0;
+        int rn = 0;
+        for (int y = ya; y <= yb; ++y)
+          for (int x = xa; x <= xb; ++x)
+            if ((y == ya || y == yb || x == xa || x == xb) && y >= 0 && y < h && x >= 0 && x < w) {
+              rs += img[y * w + x];
+              ++rn;
+            }
+        isolated = rn > 0 && real(rs) / rn <= level - isolate;
+      }
+      if (isolated && nf < kMaxFound) {
+        Glint g{real(sxs) / cnt + x0, real(sys) / cnt + y0, cnt};
         found[nf] = g;
         dist[nf] = sqrt((g.x - e.cx) * (g.x - e.cx) + (g.y - e.cy) * (g.y - e.cy));
         ++nf;
@@ -616,6 +635,49 @@ int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, i
   int m = nf < kMaxGlints ? nf : kMaxGlints;
   for (int i = 0; i < m; ++i) out[i] = found[i];
   return m;
+}
+
+bool GlintPairer::operator()(const Glint* gl, int n, Glint* left, Glint* right) {
+  if (n < 2) return false;
+  auto order = [](const Glint& p, const Glint& q, Glint* l, Glint* r) {
+    // Python: sorted(..., key=x), stable -> ties keep the original order
+    if (q.x < p.x) {
+      *l = q;
+      *r = p;
+    } else {
+      *l = p;
+      *r = q;
+    }
+  };
+  if (n_ < learn_) {
+    order(gl[0], gl[1], left, right);
+    if (n_ < kMaxLearn) {
+      sx_[n_] = right->x - left->x;
+      sy_[n_] = right->y - left->y;
+    }
+    if (++n_ == learn_) {
+      real s[kMaxLearn];
+      ref_[0] = median(sx_, learn_, s);
+      ref_[1] = median(sy_, learn_, s);
+    }
+    return true;
+  }
+  real cost = tol_ * real(sqrt(ref_[0] * ref_[0] + ref_[1] * ref_[1]));
+  bool found = false;
+  for (int i = 0; i < n; ++i)
+    for (int j = i + 1; j < n; ++j) {
+      Glint l, r;
+      order(gl[i], gl[j], &l, &r);
+      real dx = r.x - l.x - ref_[0], dy = r.y - l.y - ref_[1];
+      real c = real(sqrt(dx * dx + dy * dy));
+      if (c < cost) {
+        cost = c;
+        *left = l;
+        *right = r;
+        found = true;
+      }
+    }
+  return found;
 }
 
 // ----------------------------------------------------------------------------- eye model

@@ -23,12 +23,15 @@ uint16_t* work = nullptr;
 eye::PupilDetector* det = nullptr;
 eye::PupilGate* gate = nullptr;
 eye::EyeModel* model = nullptr;
+eye::GlintPairer* pairer = nullptr;
 int fw = 0, fh = 0;
 
 void fresh(int w, int h) {
   delete det;
   delete gate;
   delete model;
+  delete pairer;
+  pairer = new eye::GlintPairer();
   det = new eye::PupilDetector(work, w, h);
   gate = new eye::PupilGate();
   model = new eye::EyeModel(308.0f, w, h);
@@ -67,8 +70,9 @@ void runFrame() {
   Serial.printf("R %.3f %d %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %d %d %.6g %.6g %.6g %.6g %.6g %.6g %d", ms,
                 found, e.cx, e.cy, e.a, e.b, e.angle, e.support, e.contrast, e.top_vis, ok, model->ready(),
                 model->cx(), model->cy(), model->radius(), g[0], g[1], g[2], ng);
-  for (int i = 0; i < 2; ++i)
-    Serial.printf(" %.6g %.6g", i < ng ? gl[i].x : 0.0f, i < ng ? gl[i].y : 0.0f);
+  eye::Glint l{0, 0, 0}, r{0, 0, 0};
+  if (ok && !(*pairer)(gl, ng, &l, &r)) l = r = eye::Glint{0, 0, 0};
+  Serial.printf(" %.6g %.6g %.6g %.6g", l.x, l.y, r.x, r.y);
   Serial.println();
 }
 

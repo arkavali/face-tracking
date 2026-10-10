@@ -45,9 +45,14 @@ Findings
    will be designed on real IR footage. The eye-sphere model works poorly in the
    frontal through view (pupil ellipses are nearly round, minor axes ill-defined), so
    there glints are the slip fix, not the sphere.
-5. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
-   closed eye (fixed by the gate, see 4); glint matching breaks with narrow lids (wrong
-   pair picked); squint from the front; port to C++.
+5. **Glints, made robust (update).** Glint candidates must be isolated peaks (frame
+   around the blob >= 50 grey levels darker), and the LED pair is picked by its learned
+   left->right spacing (`GlintPairer`). Through the mirror with LEDs on the frame sides
+   the pupil-glint calibration now gives **1.6 deg before / 1.4 deg after the slip**
+   (p90 3.7); with narrow lids 5.8 / 5.1 (was 11.7). Full table: `summary_sim.txt`.
+6. **Open problems in the tracker**: the detector "finds" a pupil in the lash line of a
+   closed eye (fixed by the gate, see 4); squint from the front (needs real IR footage);
+   glint pairs with narrow lids still sometimes wrong.
 
 The user's phone clips are visible light: pupil and iris are equally dark there, so they
 only check geometry (lids, view angle), not the detector (23% detections on the clip

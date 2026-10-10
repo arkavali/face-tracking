@@ -118,9 +118,27 @@ struct Glint {
 };
 
 // Up to kMaxGlints blobs (>= level, <= 40 px) within reach * e.a of the pupil centre,
-// nearest first. Returns the count.
+// nearest first. A blob counts only as an isolated peak: the mean of the 1-px frame 2 px
+// outside its bounding box must be <= level - isolate. Returns the count.
 int findGlints(const uint8_t* img, int w, int h, const Ellipse& e, Glint* out, int level = 230,
-               real reach = 3);
+               real reach = 3, real isolate = 50);
+
+// Picks the two LED glints (left, right) among the candidates by their learned offset;
+// see GlintPairer in tools/pupil.py.
+class GlintPairer {
+ public:
+  explicit GlintPairer(int learn = 50, real tol = real(0.35)) : learn_(learn), tol_(tol) {}
+  bool operator()(const Glint* gl, int n, Glint* left, Glint* right);
+  bool learned() const { return n_ >= learn_; }
+
+ private:
+  static constexpr int kMaxLearn = 64;
+  int learn_;
+  real tol_;
+  real sx_[kMaxLearn], sy_[kMaxLearn];
+  int n_ = 0;
+  real ref_[2] = {0, 0};
+};
 
 class EyeModel {
  public:

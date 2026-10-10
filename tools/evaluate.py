@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from eyemodel import Calib, EyeModel, yaw_pitch
-from pupil import PupilDetector, PupilGate, find_glints
+from pupil import GlintPairer, PupilDetector, PupilGate, find_glints
 
 ROOT = Path(__file__).resolve().parent.parent
 SEQ = ROOT / "out" / "seq"
@@ -34,6 +34,7 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
     h, w = imgs.shape[1:]
     det = PupilDetector()
     gate = PupilGate()
+    pairer = GlintPairer()
     model = EyeModel(f, w, h)
     free = [i for i, g in enumerate(gts) if g["phase"] == "free"]
     t0 = time.perf_counter()
@@ -56,9 +57,10 @@ def run(name: str, warmup_s: float = 15.0) -> dict:
             r.update(cx=e.cx, cy=e.cy, a=e.a, b=e.b, support=e.support, contrast=e.contrast, top_vis=e.top_vis)
             gl = find_glints(imgs[i], e)
             r["n_glints"] = len(gl)
-            if len(gl) >= 2:     # pupil minus the mean of the two nearest glints
-                r["gx"] = e.cx - (gl[0][0] + gl[1][0]) / 2
-                r["gy"] = e.cy - (gl[0][1] + gl[1][1]) / 2
+            pair = pairer(gl)
+            if pair is not None:     # pupil minus the midpoint of the LED glint pair
+                r["gx"] = e.cx - (pair[0][0] + pair[1][0]) / 2
+                r["gy"] = e.cy - (pair[0][1] + pair[1][1]) / 2
             if "pc_vis" in g:
                 r["pc_err"] = float(np.hypot(e.cx - g["pc_vis"][0], e.cy - g["pc_vis"][1]))
             gc = model.gaze_cam(e)

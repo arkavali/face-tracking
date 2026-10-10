@@ -18,7 +18,8 @@
 //   p = pupil accepted (0 = no pupil: blink or lost), cx/cy/a/b/ang = pupil ellipse (px, rad),
 //   con = ring contrast, top = visible share of the pupil under the upper lid,
 //   ex/ey/R = eyeball centre and radius in the image (once the model is ready),
-//   gx/gy/gz = gaze unit vector in camera axes, g1/g2 = the two nearest corneal glints.
+//   gx/gy/gz = gaze unit vector in camera axes, g1/g2 = the LED glint pair (left, right),
+//   picked by its learned spacing (GlintPairer).
 // The wearer-specific calibration (AR target points, glint mapping, blink/squint ranges)
 // runs on the hub / PC from these raw values.
 #ifndef EYE_BENCH  // see bench_main.cpp for the camera-less bench build
@@ -40,6 +41,7 @@ constexpr float kFocalPx = 308.0f;  // OV2640 66 deg diagonal at 320x240 (pinhol
 uint16_t* work = nullptr;  // detector scratch (internal RAM if it fits)
 eye::PupilDetector* detector = nullptr;
 eye::PupilGate gate;
+eye::GlintPairer pairer;
 eye::EyeModel* model = nullptr;
 bool streaming = true;
 uint32_t seq = 0;
@@ -215,6 +217,7 @@ void handleCommand(String cmd) {
     delete model;
     model = new eye::EyeModel(kFocalPx, kW, kH);
     gate = eye::PupilGate();
+    pairer = eye::GlintPairer();
     Serial.println("OK reset");
   } else {
     Serial.println("ERR unknown command, try help");
@@ -312,8 +315,9 @@ void loop() {
   if (model->ready())
     n += snprintf(buf + n, sizeof(buf) - n, " ex=%.1f ey=%.1f R=%.1f", model->cx(), model->cy(), model->radius());
   if (hasGaze) n += snprintf(buf + n, sizeof(buf) - n, " gx=%.3f gy=%.3f gz=%.3f", g[0], g[1], g[2]);
-  if (ng >= 2)
-    n += snprintf(buf + n, sizeof(buf) - n, " g1x=%.1f g1y=%.1f g2x=%.1f g2y=%.1f", gl[0].x, gl[0].y, gl[1].x, gl[1].y);
+  eye::Glint gL, gR;
+  if (ok && pairer(gl, ng, &gL, &gR))
+    n += snprintf(buf + n, sizeof(buf) - n, " g1x=%.1f g1y=%.1f g2x=%.1f g2y=%.1f", gL.x, gL.y, gR.x, gR.y);
   Serial.println(buf);
 }
 

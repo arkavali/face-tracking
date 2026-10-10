@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 
 from eyemodel import EyeModel
-from pupil import PupilDetector, PupilGate, find_glints
+from pupil import GlintPairer, PupilDetector, PupilGate, find_glints
 
 REPO = Path(__file__).resolve().parent.parent
 CORE = REPO / "firmware" / "lib" / "eye_core"
@@ -63,7 +63,7 @@ def frames_from(src: str, n: int):
 
 def python_run(imgs, f):
     h, w = imgs.shape[1:]
-    det, gate, model = PupilDetector(), PupilGate(), EyeModel(f, w, h)
+    det, gate, model, pairer = PupilDetector(), PupilGate(), EyeModel(f, w, h), GlintPairer()
     rows = []
     for img in imgs:
         e = det.detect(img)
@@ -78,8 +78,9 @@ def python_run(imgs, f):
                 r[14:17] = g
             gl = find_glints(img, e)
             r[17] = len(gl)
-            for i, q in enumerate(gl):
-                r[18 + 2 * i: 20 + 2 * i] = q[:2]
+            pair = pairer(gl)
+            if pair is not None:
+                r[18:22] = [pair[0][0], pair[0][1], pair[1][0], pair[1][1]]
         r[10] = model.ready
         if model.c is not None:
             r[11:13] = model.c
@@ -120,6 +121,7 @@ def compare(ref, got, label):
     for k in (9, 10, 17):
         print(f"  {COLS[k]:9s} disagree {int((ref[:, k] != got[:, k]).sum())}")
     m = (ref[:, 10] == 1) & (got[:, 10] == 1)
+    print(f"  glint pair disagree {int((np.abs(ref[:, 18:22] - got[:, 18:22]).max(1) > 0.01).sum())}")
     for k in (11, 12, 13, 14, 15, 16):
         d = np.abs(ref[m, k] - got[m, k])
         print(f"  {COLS[k]:9s} max |diff| {d.max() if d.size else 0:.2e}")
