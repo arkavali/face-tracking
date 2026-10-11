@@ -68,6 +68,7 @@ VARIANTS = {   # name: list of channels, each channel = list of LEDs summed
     "v-pair (sweep best)": [["v_front", "v_above_nose"]],
     "cross (sweep best)": [["v_front", "v_above_nose", "sideL_far", "sideR_far"]],
     "blink v-pair": [["v_front"], ["v_above_nose"]],
+    "blink triple cam+nose": [["up_cam"], ["down_cam"], ["nose_gap"]],   # planned, not trained yet
 }
 
 

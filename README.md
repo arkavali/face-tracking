@@ -39,6 +39,10 @@ QVGA -> 4x box downscale to 80x60 -> `lib/mouth_net` (float CNN, weights from
 | `train.py` | Train the CNN on `out/calib` (`--all`, `--width`), export ONNX |
 | `export_c.py` | Weights to `firmware/lib/mouth_net/mouth_weights.h` (BatchNorm folded) |
 | `parity_test.py` | C++ net (zig host build) vs ONNX on recorded frames |
+| `ledsim.py`, `ledsweep2.py`, `ledsim2ch.py` | LED layout sweeps (pixel metric), wall bounce, blinking check |
+| `lipshapes.py`, `rt.py` | Mouth shape deformations of the head mesh; CUDA ray-triangle kernel |
+| `synth.py` | Synthetic frames + trained-net comparison of lighting variants (`render` / `train`, `--set`) |
+| `configs_catalog.py` | Writes `docs/lighting_configs.md/.json` (every tried LED config with results) |
 | `gpu.py` | CuPy loader (copy of `../eye_tracker/tools/gpu.py`) |
 
 `data/head.bin`, `data/mask.bin` (not in git): meshes dumped from the open Fusion document with a
