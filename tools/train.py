@@ -68,12 +68,16 @@ def load_session(d: Path, lag: float):
         g = cv2.imdecode(np.frombuffer(raw[o:o + n], np.uint8), cv2.IMREAD_GRAYSCALE)
         imgs[i] = cv2.resize(g, (IN_W, IN_H), interpolation=cv2.INTER_AREA)
     y = np.array([[float(r[c]) for c in CHANNELS] for r in lrows], np.float32)
+    if "valid" in lrows[0]:                        # rewound / redone prompts
+        y[np.array([r["valid"] == "0" for r in lrows])] = np.nan
     t = np.array([float(r["pc_time"]) for r in frows])
     # label at time t applies to the frame at t + lag
     if lag > 0:
         src = np.searchsorted(t, t - lag)
         y = y[np.clip(src, 0, len(y) - 1)]
         y[t - lag < t[0]] = 0
+        # frames right after a pause / rewind: their shifted label belongs to another take
+        y[np.abs(t - lag - t[np.clip(src, 0, len(t) - 1)]) > 0.2] = np.nan
     prompts = [r["prompt"] for r in lrows]
     return imgs, y, prompts
 

@@ -3,6 +3,8 @@ frame gets a label vector (own channel set, see CHANNELS).
 
   python calib_rec.py [COMx] [--reps 1] [--seed N]
 Keys: Space pause/resume, N skip the current prompt, Q/Esc stop (what is recorded is kept).
+Mistake: Space (pause), Left/Right to pick the prompt to go back to, Space again: that prompt is
+redone from its rest phase and the frames recorded for it and after it get valid=0.
 
 Per prompt: rest (neutral, shows what comes next) -> ramp in -> hold -> ramp out. The label is the
 prompt's target vector times an envelope 0..1 (0 at rest, 1 while holding), so the model also
@@ -66,6 +68,7 @@ PROMPTS = [
 # seconds: rest, ramp in, hold, ramp out
 PHASES = [("rest", 1.5), ("in", 1.0), ("hold", 2.0), ("out", 1.0)]
 FREE_SECONDS = 8.0
+KEY_LEFT, KEY_RIGHT = 2424832, 2555904   # cv2.waitKeyEx codes on Windows
 
 FONT = None
 for f in ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf"):
@@ -118,8 +121,7 @@ def main():
     mj = open(d / "frames.mjpeg", "wb")
     fcsv = open(d / "frames.csv", "w")
     fcsv.write("seq,dev_ms,pc_time,offset,len\n")
-    lcsv = open(d / "labels.csv", "w", encoding="utf-8")
-    lcsv.write("seq,prompt,phase,envelope," + ",".join(CHANNELS) + "\n")
+    rows = []   # labels, written at the end: rewinding marks earlier rows invalid
 
     k, t0, paused, pause_t = 0, time.time(), True, time.time()   # start paused: Space to begin
     n = 0
@@ -164,12 +166,13 @@ def main():
                     e = envelope(phase, f)
                     lab = [f"{target.get(c, 0) * e:.3f}" for c in CHANNELS]
                     env = f"{e:.3f}"
-                lcsv.write(f"{seq},{pid},{phase},{env}," + ",".join(lab) + "\n")
+                rows.append([seq, pid, phase, env, lab, k, True])
                 n += 1
             view = cv2.cvtColor(cv2.resize(img, None, fx=2, fy=2), cv2.COLOR_GRAY2BGR)
             if paused:
-                p = panel(view.shape[1], "ПАУЗА: пробел, чтобы начать / продолжить",
-                          f"дальше: {text}   ({k + 1}/{len(items)})", 0, (80, 200, 255))
+                p = panel(view.shape[1], "ПАУЗА: пробел - продолжить, стрелки - выбрать эмоцию",
+                          f"с: {text}   ({k + 1}/{len(items)})   (она и всё после неё перепишутся)",
+                          0, (80, 200, 255))
             elif phase == "rest":
                 p = panel(view.shape[1], "Нейтрально, отдохни", f"дальше: {text}   ({k + 1}/{len(items)})",
                           f, (150, 150, 150))
@@ -178,10 +181,24 @@ def main():
                 sub = {"in": "плавно входи", "hold": "держи", "out": "плавно отпускай", "free": "свободно"}[phase]
                 p = panel(view.shape[1], text, f"{sub}   ({k + 1}/{len(items)})", f, col)
             cv2.imshow("mouth calibration", np.vstack([view, p]))
-            key = cv2.waitKey(1) & 0xFF
+            key_ex = cv2.waitKeyEx(1)
+            key = key_ex & 0xFF if key_ex >= 0 else -1
             if key in (ord("q"), 27):
                 break
+            if paused and key_ex in (KEY_LEFT, KEY_RIGHT):
+                k = max(0, k - 1) if key_ex == KEY_LEFT else min(len(items) - 1, k + 1)
             if key == ord(" "):
+                if paused:
+                    # resume = redo the selected prompt from its rest phase; frames recorded for it
+                    # and everything after it (a mistake, or a rewind) no longer count
+                    bad = 0
+                    for r in rows:
+                        if r[6] and r[5] >= k:
+                            r[6] = False
+                            bad += 1
+                    if bad:
+                        print(f"marked {bad} frames invalid, redo from prompt {k + 1}", flush=True)
+                    t0 = now
                 paused = not paused
                 pause_t = now
             if key == ord("n"):
@@ -190,9 +207,14 @@ def main():
                 if k >= len(items):
                     break
     finally:
-        mj.close(); fcsv.close(); lcsv.close()
+        mj.close(); fcsv.close()
+        with open(d / "labels.csv", "w", encoding="utf-8") as lcsv:
+            lcsv.write("seq,prompt,phase,envelope,valid," + ",".join(CHANNELS) + "\n")
+            for seq, pid, phase, env, lab, _, ok in rows:
+                lcsv.write(f"{seq},{pid},{phase},{env},{int(ok)}," + ",".join(lab) + "\n")
         cv2.destroyAllWindows()
-        print(f"saved {n} labelled frames to {d}", flush=True)
+        good = sum(r[6] for r in rows)
+        print(f"saved {n} frames ({good} valid labels) to {d}", flush=True)
 
 
 if __name__ == "__main__":
