@@ -72,3 +72,25 @@ Sim: the brow_tracker head models plus a parametric jaw/lip rig can render the I
 candidate muzzle positions for a placement sweep (as in `../eye_tracker/docs/placement.md`)
 once the muzzle geometry is known. The renderer is to be written for the GPU from the start
 (CuPy via `../eye_tracker/tools/gpu.py`, RTX 5070), with a NumPy fallback.
+
+## Placement sweep (2026-10-11, `tools/sweep.py`, `tools/preview.py`)
+
+Head and mask meshes exported read-only from the Fusion design (`avali_head_V0.5 v63`: mask body
+`forehead R`, head mesh `ImageToStl.com_vhs+`). Camera on the midline aimed at the mouth ROI (lips
++-34 mm with smile margin, lower lip and chin of a 22 deg open jaw), worst case over the camera
+shifted +-10 mm in x/y/z, 320x240, fan zone (z > 340 mm, beak tip) kept free. Mouth slit at
+y = 99, z = 246 mm; inner beak wall ~125 mm in front of it.
+
+| Lens | Closest full-cover spot | Scale on lips | Full-cover spots outside the fan zone |
+|---|---|---|---|
+| 120 deg | 45 mm in front, 26 mm above the slit | 3.0 px/mm | 114 |
+| 160 deg | 40 mm in front, 16 mm above | 2.5 px/mm | 136 |
+| 66 deg | 75 mm in front, 46 mm above | 3.3 px/mm | 27 (narrow band) |
+
+Recommended: **120 deg, ~55-60 mm in front of the mouth and ~30 mm above it** (just below the
+nose tip, tilted down at the mouth): one step inside the full-cover zone, ~2.5 px/mm, mouth fills
+most of the frame. 66 deg also works but only far forward and high, close to the fan zone, and a
+small mask shift loses the chin. Maps: `placement_sweep.png`; views: `placement_preview.png`.
+
+Caveats: generic head mesh, not the wearer's face; the mask's jaw/palate are not modelled yet;
+lens FOV taken as diagonal (equidistant fisheye for 120/160 deg).
