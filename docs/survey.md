@@ -176,3 +176,12 @@ val MAE on 1200 held-out frames (seed spread +-0.001).
   model): outside light can come in there (matters for blinking; a dark frame may be needed).
 - Caveats: synthetic, rough deformations on a generic head, uniform NIR skin with blotches,
   no teeth / tongue; confirm on hardware once the mask is built.
+- **Triangle (user's sketch, `synth_report_triangle.txt`, `synth_triangle.png`)**: top LED
+  between camera and nose (0, +38, +40) or under the lens (0, +22, +55) + two low side LEDs
+  (+-35..55, -12..-35, +55..65), 3-channel blinking: 0.027-0.029; top vs both low together
+  (2 channels): 0.027; all three lit together: 0.034; reference vertical pair blink 0.026.
+  Splitting the two low LEDs adds nothing.
+- **Conclusion:** what matters is light from above and light from below in separate frames. Two
+  LEDs (above the camera, below the lips) with 2-phase blinking are enough; the triangle is an
+  equivalent fallback if a low centre mount is awkward (both low LEDs fire together). Balance
+  the LED currents so both frames have similar brightness (the study used one locked exposure).
