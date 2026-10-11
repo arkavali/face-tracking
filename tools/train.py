@@ -25,7 +25,7 @@ from calib_rec import CHANNELS
 ROOT = Path(__file__).resolve().parent.parent
 CALIB = ROOT / "out" / "calib"
 OUT = ROOT / "out" / "model"
-IN_W, IN_H = 96, 72
+IN_W, IN_H = 80, 60   # exact 4x box downscale of 320x240 (same on the chip)
 
 
 class MouthNet(nn.Module):
@@ -115,6 +115,7 @@ def main():
     ap.add_argument("--lag", type=float, default=0.35)
     ap.add_argument("--val", help="session dir name held out for validation (default: the last one)")
     ap.add_argument("--batch", type=int, default=128)
+    ap.add_argument("--width", default="16,24,32,48,64", help="conv channels per block")
     ap.add_argument("--all", action="store_true", help="train on all sessions, validate on held-out prompt blocks")
     ap.add_argument("--keep-rest", action="store_true", help="train on the rest phases as neutral too")
     args = ap.parse_args()
@@ -149,7 +150,8 @@ def main():
     Xva = torch.tensor(np.concatenate(va_x)[:, None], dtype=torch.float32, device=dev) / 255
     Yva = torch.tensor(np.concatenate(va_y), device=dev)
 
-    model = MouthNet().to(dev)
+    width = tuple(int(v) for v in args.width.split(","))
+    model = MouthNet(width=width).to(dev)
     print(f"params {sum(p.numel() for p in model.parameters())}, MAC {macs(model) / 1e6:.1f} M, "
           f"train {len(Xtr)}, val {len(Xva)}, device {dev}")
     opt = torch.optim.AdamW(model.parameters(), 3e-3, weight_decay=1e-4)
@@ -194,7 +196,7 @@ def main():
     print("\n".join(lines))
     torch.onnx.export(model.cpu(), torch.zeros(1, 1, IN_H, IN_W), OUT / "mouth.onnx",
                       input_names=["img"], output_names=["out"], dynamic_axes={"img": {0: "b"}, "out": {0: "b"}})
-    (OUT / "mouth.json").write_text(json.dumps({"channels": CHANNELS, "in_w": IN_W, "in_h": IN_H}))
+    (OUT / "mouth.json").write_text(json.dumps({"channels": CHANNELS, "in_w": IN_W, "in_h": IN_H, "width": width}))
     print("saved", OUT / "mouth.onnx")
 
 

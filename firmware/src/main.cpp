@@ -1,5 +1,6 @@
-// Mouth camera streamer: ESP32-CAM sends hardware-JPEG frames to the PC over Serial for
-// live view and recordings (tools/mouth_cam.py). No tracking on the chip yet.
+// Mouth camera: ESP32-CAM either streams hardware-JPEG frames to the PC (live view, recordings:
+// tools/mouth_cam.py, calib_rec.py) or runs the mouth CNN on the chip (lib/mouth_net, weights
+// from tools/export_c.py) and sends the values (tools/mouth_live.py --board).
 //
 // Serial commands (921600 baud, one per line):
 //   help                  this list
@@ -11,11 +12,19 @@
 //   led N                 flash LED (GPIO 4) PWM 0..255, 0 = off
 //   reg ADDR [VALUE]      read / write a camera register (hex, debugging)
 //   status                frame size, quality, fps, bytes per frame
-// Frame: "JPG seq w h len ms\n" + len bytes of JPEG. Text replies start with other words.
+//   mode stream|track     JPEG streaming (default) or on-chip tracking
+//   preview N             track mode: send the 80x60 net input every N-th frame (0 = off, default 2)
+//   bench                 track mode: time downscale + net on the current frame
+// Frame: "JPG seq w h len ms\n" + len bytes of JPEG.
+// Track: "MOUTH seq ms net_ms v0 .. v21\n" (values x1000, channel order: "CH" line after mode track)
+//        and "PRV seq 80 60 4800\n" + 4800 grey bytes when preview is on.
+// Text replies start with other words.
 #include <Arduino.h>
 
 #include "camera_pins.h"
 #include "esp_camera.h"
+#include "esp_heap_caps.h"
+#include "mouth_net.h"
 
 namespace {
 
@@ -27,6 +36,20 @@ framesize_t frameSize = FRAMESIZE_QVGA;
 uint32_t seq = 0, fpsFrames = 0, fpsT0 = 0, bytesSum = 0, camRestarts = 0, lastFrameMs = 0;
 float fps = 0, avgBytes = 0;
 String line;
+bool tracking = false;
+int previewEvery = 2;
+float* netA = nullptr;
+float* netB = nullptr;
+uint8_t small[80 * 60];
+float netOut[32];
+float netMs = 0;
+
+float* allocFloats(size_t n) {
+  // internal RAM is several times faster than PSRAM on the classic ESP32; PSRAM as a fallback
+  void* p = heap_caps_malloc(n * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!p) p = heap_caps_malloc(n * sizeof(float), MALLOC_CAP_SPIRAM);
+  return (float*)p;
+}
 
 bool initCamera() {
   camera_config_t c = {};
@@ -49,7 +72,7 @@ bool initCamera() {
   c.pin_pwdn = PWDN_GPIO_NUM;
   c.pin_reset = RESET_GPIO_NUM;
   c.xclk_freq_hz = 20000000;
-  c.pixel_format = PIXFORMAT_JPEG;
+  c.pixel_format = tracking ? PIXFORMAT_GRAYSCALE : PIXFORMAT_JPEG;
   c.frame_size = frameSize;
   c.jpeg_quality = quality;
   c.fb_count = 2;
@@ -57,10 +80,13 @@ bool initCamera() {
   c.grab_mode = CAMERA_GRAB_LATEST;
   if (esp_camera_init(&c) != ESP_OK) return false;
   esp_log_level_set("cam_hal", ESP_LOG_NONE);  // driver log lines would land inside JPEG data
+  sensor_t* s0 = esp_camera_sensor_get();
+  // non-JPEG modes run the OV2640 at a quarter clock (12.5 fps); divider 1 = 25 fps (brow_tracker)
+  if (tracking && s0 && s0->id.PID == OV2640_PID) s0->set_reg(s0, 0x111, 0xff, 0x01);
   // Grey picture: the IR image has no colour anyway, and without chroma the JPEG is ~30 %
   // smaller, which is what limits the frame rate on the 921600-baud link.
   sensor_t* sen = esp_camera_sensor_get();
-  if (sen) sen->set_special_effect(sen, gray ? 2 : 0);
+  if (sen && !tracking) sen->set_special_effect(sen, gray ? 2 : 0);
   return true;
 }
 
@@ -76,9 +102,10 @@ void printStatus() {
   if (frameSize == FRAMESIZE_CIF) w = 400, h = 296;
   if (frameSize == FRAMESIZE_VGA) w = 640, h = 480;
   sensor_t* sen = esp_camera_sensor_get();
-  Serial.printf("STATUS size %dx%d q %d fps %.1f avg %.0f B/frame stream %d restarts %u PID 0x%02x psram %u\n", w, h,
-                quality, millis() - lastFrameMs > 1000 ? 0.0f : fps, avgBytes, streaming, camRestarts,
-                sen ? sen->id.PID : 0, ESP.getFreePsram());
+  Serial.printf("STATUS mode %s size %dx%d q %d fps %.1f avg %.0f B/frame net %.1f ms stream %d restarts %u "
+                "PID 0x%02x heap %u psram %u\n", tracking ? "track" : "stream", w, h, quality,
+                millis() - lastFrameMs > 1000 ? 0.0f : fps, avgBytes, netMs, streaming, camRestarts,
+                sen ? sen->id.PID : 0, ESP.getFreeHeap(), ESP.getFreePsram());
 }
 
 void handleCommand(String cmd) {
@@ -89,7 +116,8 @@ void handleCommand(String cmd) {
   String w(word), a(arg);
   sensor_t* sen = esp_camera_sensor_get();
   if (w == "help") {
-    Serial.println("INFO stream on|off, size qvga|cif|vga, q N, gray on|off, exp auto|N, led N, reg ADDR [VAL], status");
+    Serial.println("INFO stream on|off, size qvga|cif|vga, q N, gray on|off, exp auto|N, led N, reg ADDR [VAL], "
+                   "status, mode stream|track, preview N, bench");
   } else if (w == "stream" && n == 2) {
     streaming = a == "on";
   } else if (w == "size" && n == 2) {
@@ -117,6 +145,47 @@ void handleCommand(String cmd) {
     Serial.printf("REG 0x%03x = 0x%02x\n", addr, sen->get_reg(sen, addr, 0xff));
   } else if (w == "status") {
     printStatus();
+  } else if (w == "mode" && n == 2) {
+    bool want = a == "track";
+    if (want && !netA) {
+      size_t na, nb;
+      mouth::scratchSizes(&na, &nb);
+      netA = allocFloats(na);
+      netB = allocFloats(nb);
+      bool inRam = mouth::init([](size_t n) { return heap_caps_malloc(n, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); });
+      Serial.printf("INFO net weights in %s, heap left %u\n", inRam ? "RAM" : "flash (partly)", ESP.getFreeHeap());
+      if (!netA || !netB) {
+        Serial.println("ERR no memory for the net");
+        return;
+      }
+    }
+    if (want != tracking) {
+      tracking = want;
+      esp_camera_deinit();
+      delay(50);
+      if (!initCamera()) Serial.println("ERR camera init failed");
+    }
+    if (tracking) {
+      Serial.print("CH");
+      for (int i = 0; i < mouth::outputCount(); ++i) Serial.printf(" %s", mouth::channelName(i));
+      Serial.println();
+    }
+  } else if (w == "preview" && n == 2) {
+    previewEvery = max(0, (int)a.toInt());
+  } else if (w == "bench") {
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb || !tracking) {
+      Serial.println("ERR bench needs mode track");
+      if (fb) esp_camera_fb_return(fb);
+      return;
+    }
+    uint32_t t0 = micros();
+    mouth::downscale4(fb->buf, fb->width, fb->height, small);
+    uint32_t t1 = micros();
+    mouth::run(small, netA, netB, netOut);
+    uint32_t t2 = micros();
+    esp_camera_fb_return(fb);
+    Serial.printf("INFO bench downscale %.2f ms net %.1f ms\n", (t1 - t0) / 1000.0f, (t2 - t1) / 1000.0f);
   } else {
     Serial.printf("ERR unknown command: %s\n", cmd.c_str());
   }
@@ -131,7 +200,7 @@ void setup() {
   analogWrite(kLedPin, 0);
   if (!initCamera()) Serial.println("ERR camera init failed");
   fpsT0 = millis();
-  Serial.println("INFO mouth streamer ready");
+  Serial.println("INFO mouth camera ready");
 }
 
 void loop() {
@@ -157,10 +226,32 @@ void loop() {
     return;
   }
   lastFrameMs = millis();
-  Serial.printf("JPG %u %u %u %u %u\n", seq++, fb->width, fb->height, (unsigned)fb->len, (unsigned)lastFrameMs);
-  Serial.write(fb->buf, fb->len);
-  bytesSum += fb->len;
-  esp_camera_fb_return(fb);
+  if (tracking) {
+    if (fb->width != 320 || fb->height != 240 || fb->len != 320 * 240) {  // short frame
+      esp_camera_fb_return(fb);
+      return;
+    }
+    mouth::downscale4(fb->buf, fb->width, fb->height, small);
+    esp_camera_fb_return(fb);  // the net works on the small copy: the driver can refill meanwhile
+    uint32_t t0 = micros();
+    mouth::run(small, netA, netB, netOut);
+    netMs = (micros() - t0) / 1000.0f;
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "MOUTH %u %u %.1f", seq, (unsigned)lastFrameMs, netMs);
+    for (int i = 0; i < mouth::outputCount() && len < (int)sizeof(buf) - 8; ++i)
+      len += snprintf(buf + len, sizeof(buf) - len, " %d", (int)(netOut[i] * 1000 + 0.5f));
+    Serial.println(buf);
+    if (previewEvery && seq % previewEvery == 0) {
+      Serial.printf("PRV %u 80 60 4800\n", seq);
+      Serial.write(small, sizeof(small));
+    }
+    ++seq;
+  } else {
+    Serial.printf("JPG %u %u %u %u %u\n", seq++, fb->width, fb->height, (unsigned)fb->len, (unsigned)lastFrameMs);
+    Serial.write(fb->buf, fb->len);
+    bytesSum += fb->len;
+    esp_camera_fb_return(fb);
+  }
   ++fpsFrames;
   if (millis() - fpsT0 >= 1000) {
     fps = fpsFrames * 1000.0f / (millis() - fpsT0);

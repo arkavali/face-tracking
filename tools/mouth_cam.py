@@ -68,7 +68,9 @@ class Stream:
                 if nl < 0:
                     break
                 j = self.buf.find(b"JPG ", 0, nl)
-                if j > 0:               # joined mid-frame: JPEG tail glued to the next header
+                if j < 0:
+                    j = self.buf.find(b"PRV ", 0, nl)
+                if j > 0:               # joined mid-frame: binary tail glued to the next header
                     self.buf = self.buf[j:]
                     nl -= j
                 head = self.buf[:nl].decode("ascii", "replace").strip()
@@ -86,9 +88,21 @@ class Stream:
                         self.bad += 1   # bytes lost on the line: skip, resync on the next header
                         continue
                     yield [int(x) for x in parts[1:]], data
+                elif head.startswith("PRV "):
+                    # track mode preview: "PRV seq w h len" + raw grey bytes
+                    parts = head.split()
+                    if len(parts) != 5 or not all(x.isdigit() for x in parts[1:]):
+                        self.buf = self.buf[nl + 1:]
+                        continue
+                    n = int(parts[4])
+                    if len(self.buf) < nl + 1 + n:
+                        break
+                    data = self.buf[nl + 1:nl + 1 + n]
+                    self.buf = self.buf[nl + 1 + n:]
+                    yield None, ("PRV", [int(x) for x in parts[1:]], data)
                 else:
                     self.buf = self.buf[nl + 1:]
-                    if head and head.split()[0] in ("INFO", "ERR", "STATUS", "REG"):
+                    if head and head.split()[0] in ("INFO", "ERR", "STATUS", "REG", "MOUTH", "CH"):
                         yield None, head
 
 
@@ -115,7 +129,8 @@ def main():
     t_last, n_fps, fps = time.time(), 0, 0.0
     for head, data in st.frames():
         if head is None:
-            print(data)
+            if isinstance(data, str) and not data.startswith(("MOUTH", "CH")):
+                print(data)
             continue
         seq, w, h, n, ms = head
         img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_GRAYSCALE)

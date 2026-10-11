@@ -10,15 +10,20 @@ Survey, camera choice and placement: [docs/survey.md](docs/survey.md).
 |---|---|
 | `flash_firmware.bat` | Build `firmware/` (JPEG streamer) and flash the AI-Thinker ESP32-CAM |
 | `calib_rec.bat [COMx] [--reps N]` | Prompted calibration recording (~3 min per pass, 30 expressions) to `out/calib/cal_*` with per-frame labels |
+| `mouth_live.bat [--babble]` | Trained model on the PC: live picture + value bars (L LED) |
+| `mouth_board.bat` | The model running on the ESP32-CAM itself (~10 fps, 93 ms per frame): bars from the board |
 | `mouth_cam.bat [COMx]` | Live view; R records to `out/cam/rec_*` (frames.mjpeg + frames.csv), S snapshot, L flash LED, Q quit |
 
 The brow firmware for the same board: `../brow_tracker/flash_firmware.bat`.
 
 ## Firmware (`firmware/`)
 
-Streamer only (no tracking yet): hardware JPEG 320x240 over Serial at 921600 baud,
-~14 fps at ~6 KB/frame, no lost frames (2 Mbaud lost data on the CH340). Commands: header of
-`firmware/src/main.cpp`.
+Two modes (command `mode stream|track`): hardware JPEG 320x240 over Serial at 921600 baud
+(~15 fps, ~6 KB/frame, grey; 2 Mbaud lost data on the CH340), or on-chip tracking: raw grey
+QVGA -> 4x box downscale to 80x60 -> `lib/mouth_net` (float CNN, weights from
+`tools/export_c.py`, copied to internal RAM) -> `MOUTH` line with 22 values. Classic ESP32:
+93 ms per frame for the 2.2 M MAC net (570 ms for the first 8.3 M MAC one, weights in flash),
+~10 fps. Commands: header of `firmware/src/main.cpp`.
 
 ## Tools (`tools/`)
 
@@ -31,6 +36,9 @@ Streamer only (no tracking yet): hardware JPEG 320x240 over Serial at 921600 bau
 | `mouth_cam.py` | Serial live view / recorder for the streamer |
 | `calib_rec.py` | Prompted calibration recorder; own channel set (`CHANNELS`), labels = target x envelope |
 | `teacher.py` | Babble face model (data/babble_face.onnx, non-commercial licence) on recordings -> babble.npz |
+| `train.py` | Train the CNN on `out/calib` (`--all`, `--width`), export ONNX |
+| `export_c.py` | Weights to `firmware/lib/mouth_net/mouth_weights.h` (BatchNorm folded) |
+| `parity_test.py` | C++ net (zig host build) vs ONNX on recorded frames |
 | `gpu.py` | CuPy loader (copy of `../eye_tracker/tools/gpu.py`) |
 
 `data/head.bin`, `data/mask.bin` (not in git): meshes dumped from the open Fusion document with a
