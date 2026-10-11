@@ -114,3 +114,14 @@ Layout score = how far apart the shapes stay in the 80x60 net input relative to 
 - Hardest pairs in every layout: neutral vs smile and pucker vs pucker-up (small geometric change).
 - Raw speed: the CUDA kernel casts 20k rays against 44k triangles in ~30 ms; the whole sweep
   (7 shapes x 7 shifts x 137 LEDs, all with shadow rays) takes ~100 s.
+
+## Open ideas
+
+- **Time-multiplexed IR LEDs (photometric stereo).** 2-3 IR LEDs from different sides (e.g. the
+  +-45 mm pair) switched alternately in step with camera frames (S3 GPIO on the VSYNC interrupt).
+  Brightness ratios between frames give the surface normal, i.e. lip / cheek shape, not only
+  texture. OV2640 is rolling-shutter: switch in vertical blanking with exposure shorter than the
+  blanking, or use an A,A,B,B pattern and drop transition frames, or keep one LED steady and blink
+  the other. Costs half the frame rate per source. Two-wavelength separation does not work (OV2640
+  Bayer filters are nearly equal in NIR). Mouth LEDs may be brighter than eye LEDs, aimed away from
+  the eyes and glasses.
