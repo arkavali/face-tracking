@@ -139,3 +139,40 @@ Layout score = how far apart the shapes stay in the 80x60 net input relative to 
   synthetic shapes, uniform skin, linear / nearest-centroid metrics instead of a trained net.
   Conclusion: side pair lit together by default; alternation only as a cheap hardware experiment
   later (e.g. one LED steady, one blinking) once the mask exists.
+
+## LED layout, round 2 and trained-net study (2026-10-11/12)
+
+**Round 2 sweep** (`tools/ledsweep2.py`, `led2_report.txt`, `led2_layouts.png`, `led2_map.png`):
+one diffuse bounce off the inner beak wall (wall sampled into patches, albedo 0 / 0.5 / 0.8),
+769 LED spots incl. near the camera, vertical pairs, triples, crosses. The bounce changes the
+scores by <= 0.05; side pair +-45 mm at mouth height still best by the pixel metric, a cross
+(side pair + vertical pair) slightly better, LEDs closer to the camera worse. Wider pairs
+(+-55-65 mm, `led2_wide_report.txt`) leave less of the mouth dark but separate the shapes worse.
+
+**Trained-net study** (`tools/synth.py`, reports `synth_report_*.txt`, picture `synth_samples.png`):
+6000 synthetic frames per LED set = random mixes of 8 mouth deformations (jaw, smile L/R, pucker,
+"o" opening, lips up, cheek puff L/R), random mask shift +-5 mm and aim change, smooth albedo
+pattern, +-15 % LED gain, wall bounce, sensor noise, 8-bit; every LED rendered alone, lighting
+variants built afterwards; the mouth CNN (width 8,12,16,24,32) trained per variant, 3-5 seeds,
+val MAE on 1200 held-out frames (seed spread +-0.001).
+
+| Lighting | val MAE | pucker |
+|---|---|---|
+| any LEDs lit together (lens, side pairs, vertical pair, cross, triple) | 0.031-0.033 | 0.026-0.033 |
+| blinking side pair (L frame + R frame as 2 channels) | 0.030 | 0.027 |
+| **blinking vertical pair** (LED above/behind the camera + LED below the lips) | **0.025-0.026** | **0.019-0.021** |
+| control: vertical pair lit together, fed twice (2 identical channels) | 0.033 | 0.031 |
+| blinking vertical pair + sides as 3rd/4th channel | 0.026-0.027 | 0.020 |
+
+- The pixel-distance metric of round 1/2 could not see this: the gain is non-linear (light from
+  below vs from above makes pushed-out lips cast different shadows), the trained net uses it.
+- The control rules out noise averaging: two channels only help when they carry different light.
+- Position of the vertical pair is not critical: all 16 tested up x down combinations give
+  0.025-0.029; best: up (0, +55, +60) = above the camera, down (0, -35, +65) (x, mm above the
+  slit, mm in front). Worse: up LED in front of the camera, down LED close to the face.
+- All tested LED spots are outside the camera view (checked by projection); the earlier
+  sweeps did not filter for this, but their winners are outside the view too.
+- The beak has an opening at the bottom front (about 20-75 mm below the mouth line in the
+  model): outside light can come in there (matters for blinking; a dark frame may be needed).
+- Caveats: synthetic, rough deformations on a generic head, uniform NIR skin with blotches,
+  no teeth / tongue; confirm on hardware once the mask is built.

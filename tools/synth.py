@@ -86,7 +86,24 @@ VARIANTS_V.update({
     "blink 3ch U1/D1/sides": [["U1"], ["D1"], ["L", "R"]],
     "blink 4ch U1/D1/L/R": [["U1"], ["D1"], ["L"], ["R"]],
 })
-SETS = {"main": (LEDS, VARIANTS, "data.npz"), "vertical": (LEDS_V, VARIANTS_V, "data_vertical.npz")}
+# third study (user's sketch): triangle - one LED top centre (between nose and lips), two low at the sides
+LEDS_T = {
+    "T1": rel_to_world(0, 38, 40), "T2": rel_to_world(0, 22, 55),   # both outside the camera view
+    "BL1": rel_to_world(45, -25, 60), "BR1": rel_to_world(-45, -25, 60),
+    "BL2": rel_to_world(55, -12, 55), "BR2": rel_to_world(-55, -12, 55),
+    "BL3": rel_to_world(35, -35, 65), "BR3": rel_to_world(-35, -35, 65),
+    "U1": rel_to_world(0, 45, 55), "D1": rel_to_world(0, -25, 50),
+}
+VARIANTS_T = {}
+for t in ("T1", "T2"):
+    for b in ("1", "2", "3"):
+        VARIANTS_T[f"tri blink {t}/BL{b}/BR{b}"] = [[t], ["BL" + b], ["BR" + b]]
+    VARIANTS_T[f"tri 2ch {t}/(BL1+BR1)"] = [[t], ["BL1", "BR1"]]
+    VARIANTS_T[f"tri both {t}+BL1+BR1"] = [[t, "BL1", "BR1"]]
+VARIANTS_T["ref blink U1/D1"] = [["U1"], ["D1"]]
+VARIANTS_T["ref both U1+D1"] = [["U1", "D1"]]
+SETS = {"main": (LEDS, VARIANTS, "data.npz"), "vertical": (LEDS_V, VARIANTS_V, "data_vertical.npz"),
+        "triangle": (LEDS_T, VARIANTS_T, "data_triangle.npz")}
 
 
 def side_smile(v, side, amount):
