@@ -70,4 +70,5 @@ whether the jaw of the mask moves in front of the camera.
 
 Sim: the brow_tracker head models plus a parametric jaw/lip rig can render the IR view from
 candidate muzzle positions for a placement sweep (as in `../eye_tracker/docs/placement.md`)
-once the muzzle geometry is known.
+once the muzzle geometry is known. The renderer is to be written for the GPU from the start
+(CuPy via `../eye_tracker/tools/gpu.py`, RTX 5070), with a NumPy fallback.
