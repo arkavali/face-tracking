@@ -52,6 +52,10 @@ class Stream:
                 nl = self.buf.find(b"\n")
                 if nl < 0:
                     break
+                j = self.buf.find(b"JPG ", 0, nl)
+                if j > 0:               # joined mid-frame: JPEG tail glued to the next header
+                    self.buf = self.buf[j:]
+                    nl -= j
                 head = self.buf[:nl].decode("ascii", "replace").strip()
                 if head.startswith("JPG "):
                     parts = head.split()
