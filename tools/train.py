@@ -58,7 +58,7 @@ def macs(model):
     return total
 
 
-def load_session(d: Path, lag: float):
+def load_session(d: Path, lag: float, keep_rest: bool = False):
     raw = (d / "frames.mjpeg").read_bytes()
     frows = list(csv.DictReader(open(d / "frames.csv")))
     lrows = list(csv.DictReader(open(d / "labels.csv", encoding="utf-8")))
@@ -70,6 +70,8 @@ def load_session(d: Path, lag: float):
     y = np.array([[float(r[c]) for c in CHANNELS] for r in lrows], np.float32)
     if "valid" in lrows[0]:                        # rewound / redone prompts
         y[np.array([r["valid"] == "0" for r in lrows])] = np.nan
+    if not keep_rest:   # the face is not always neutral between prompts; "neutral" covers zero
+        y[np.array([r["phase"] == "rest" for r in lrows])] = np.nan
     t = np.array([float(r["pc_time"]) for r in frows])
     # label at time t applies to the frame at t + lag
     if lag > 0:
@@ -113,22 +115,31 @@ def main():
     ap.add_argument("--lag", type=float, default=0.35)
     ap.add_argument("--val", help="session dir name held out for validation (default: the last one)")
     ap.add_argument("--batch", type=int, default=128)
+    ap.add_argument("--all", action="store_true", help="train on all sessions, validate on held-out prompt blocks")
+    ap.add_argument("--keep-rest", action="store_true", help="train on the rest phases as neutral too")
     args = ap.parse_args()
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    sessions = sorted(p for p in CALIB.glob("cal_*") if (p / "labels.csv").exists())
+    sessions = sorted(p for p in CALIB.glob("cal_*") if (p / "labels.csv").exists()
+                      and sum(1 for _ in open(p / "frames.csv")) > 50)
     if not sessions:
         raise SystemExit("no recordings in out/calib")
-    val_name = args.val or (sessions[-1].name if len(sessions) > 1 else None)
+    val_name = None if args.all else args.val or (sessions[-1].name if len(sessions) > 1 else None)
     tr_x, tr_y, va_x, va_y, va_p = [], [], [], [], []
     for s in sessions:
-        x, y, p = load_session(s, args.lag)
+        x, y, p = load_session(s, args.lag, args.keep_rest)
         ok = ~np.isnan(y).any(1)
         if s.name == val_name:
             va_x.append(x[ok]); va_y.append(y[ok]); va_p += [q for q, k in zip(p, ok) if k]
+        elif args.all:      # every session: every 5th prompt block goes to validation
+            pp = [q for q, k in zip(p, ok) if k]
+            blocks = np.cumsum([0] + [a != b for a, b in zip(pp, pp[1:])])
+            hold = blocks % 5 == 2
+            tr_x.append(x[ok][~hold]); tr_y.append(y[ok][~hold])
+            va_x.append(x[ok][hold]); va_y.append(y[ok][hold])
         else:
             tr_x.append(x[ok]); tr_y.append(y[ok])
         print(f"{s.name}: {len(x)} frames, {ok.sum()} labelled{' (validation)' if s.name == val_name else ''}")
-    if not tr_x:                       # a single session: hold out every 5th prompt block
+    if not tr_x and va_p:              # a single session: hold out every 5th prompt block
         x, y = va_x[0], va_y[0]
         blocks = np.cumsum([0] + [a != b for a, b in zip(va_p, va_p[1:])])
         hold = blocks % 5 == 4
