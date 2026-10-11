@@ -2,7 +2,7 @@
 
   python mouth_live.py [COMx] [--smooth 0.5] [--babble]
 --babble adds the Babble face model's matching channels as thin bars for comparison.
-Keys: Q/Esc quit.
+Keys: L cycle the flash LED (starts at --led, default dim), Q/Esc quit.
 """
 from __future__ import annotations
 
@@ -36,10 +36,11 @@ def main():
     ap.add_argument("port", nargs="?")
     ap.add_argument("--smooth", type=float, default=0.5, help="EMA factor of the previous value (0 = raw)")
     ap.add_argument("--babble", action="store_true")
+    ap.add_argument("--led", type=int, default=20, help="flash LED level at start (0..255, L cycles)")
     args = ap.parse_args()
     meta = json.loads((MODEL / "mouth.json").read_text())
     names, iw, ih = meta["channels"], meta["in_w"], meta["in_h"]
-    prov = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    prov = ["CPUExecutionProvider"]   # ~1 ms on the CPU; CUDA EP would need cuDNN in PATH
     sess = ort.InferenceSession(str(MODEL / "mouth.onnx"), providers=prov)
     bab = None
     if args.babble:
@@ -49,6 +50,9 @@ def main():
     st = Stream(args.port or find_port())
     time.sleep(0.3)
     st.send("stream on")
+    led = sorted({0, 20, 80, args.led})
+    led_i = led.index(args.led)
+    st.send(f"led {args.led}")
     val = np.zeros(len(names), np.float32)
     t_last, n_fps, fps, ms = time.time(), 0, 0.0, 0.0
     for head, data in st.frames():
@@ -81,10 +85,14 @@ def main():
                 bv = float(np.mean(by[bidx[nm]]))
                 cv2.rectangle(bars, (110, yy + rh - 6), (110 + int(200 * bv), yy + rh - 3), (255, 120, 60), -1)
             cv2.putText(bars, nm, (4, yy + rh - 6), 0, 0.42, (220, 220, 220), 1)
-        cv2.putText(view, f"{fps:.1f} fps, model {ms:.1f} ms", (8, 22), 0, 0.6, (0, 255, 0), 2)
+        cv2.putText(view, f"{fps:.1f} fps, model {ms:.1f} ms, LED {led[led_i]}", (8, 22), 0, 0.6, (0, 255, 0), 2)
         cv2.imshow("mouth live", np.hstack([view, bars]))
-        if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+        key = cv2.waitKey(1) & 0xFF
+        if key in (ord("q"), 27):
             break
+        if key == ord("l"):
+            led_i = (led_i + 1) % len(led)
+            st.send(f"led {led[led_i]}")
 
 
 if __name__ == "__main__":
