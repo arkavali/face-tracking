@@ -71,6 +71,24 @@ VARIANTS = {   # name: list of channels, each channel = list of LEDs summed
 }
 
 
+# second study: where exactly to put the upper / lower LED of the blinking vertical pair
+LEDS_V = {
+    "U1": rel_to_world(0, 45, 55), "U2": rel_to_world(0, 40, 70), "U3": rel_to_world(0, 38, 40),
+    "U4": rel_to_world(0, 55, 60),
+    "D1": rel_to_world(0, -25, 50), "D2": rel_to_world(0, -35, 65), "D3": rel_to_world(0, -10, 45),
+    "D4": rel_to_world(0, -20, 75),
+    "L": rel_to_world(45, 10, 60), "R": rel_to_world(-45, 10, 60),
+}
+VARIANTS_V = {f"blink {u}/{d}": [[u], [d]] for u in ("U1", "U2", "U3", "U4") for d in ("D1", "D2", "D3", "D4")}
+VARIANTS_V.update({
+    "both U1+D1": [["U1", "D1"]],
+    "control: U1+D1 twice": [["U1", "D1"], ["U1", "D1"]],     # 2 channels, no extra light info
+    "blink 3ch U1/D1/sides": [["U1"], ["D1"], ["L", "R"]],
+    "blink 4ch U1/D1/L/R": [["U1"], ["D1"], ["L"], ["R"]],
+})
+SETS = {"main": (LEDS, VARIANTS, "data.npz"), "vertical": (LEDS_V, VARIANTS_V, "data_vertical.npz")}
+
+
 def side_smile(v, side, amount):
     out = v.copy()
     c = np.array([side * 25.0, SLIT[1], SLIT[2] - 6])
@@ -171,7 +189,7 @@ def bounce_fast(g, leds, sh, aim, pc, pn, pa):
     return (G @ B) * g["alb"][:, None]
 
 
-def render(n):
+def render(n, set_name="main"):
     OUT.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(7)
     base, faces = lipshapes.load_indexed("head")
@@ -180,8 +198,9 @@ def render(n):
     mask_tris = Scene(("mask",)).tris
     ledsweep2.N_PATCH = 600            # the bounce is a small, smooth term: fewer wall patches suffice
     pc, pn, pa = ledsweep2.wall_patches(mask_tris, np.random.default_rng(3))
-    names = list(LEDS)
-    leds = np.array([LEDS[k] for k in names])
+    led_dict, _, fname = SETS[set_name]
+    names = list(led_dict)
+    leds = np.array([led_dict[k] for k in names])
     X = np.zeros((n, len(names), 60, 80), np.float16)
     Y = np.zeros((n, len(LABELS)), np.float32)
     t0 = time.time()
@@ -201,14 +220,14 @@ def render(n):
         Y[s] = w
         if s % 200 == 0:
             print(f"  {s}/{n}  {time.time() - t0:.0f} s", flush=True)
-    np.savez_compressed(OUT / "data.npz", X=X, Y=Y, leds=np.array(names), labels=np.array(LABELS))
+    np.savez_compressed(OUT / fname, X=X, Y=Y, leds=np.array(names), labels=np.array(LABELS))
     print(f"rendered {n} samples in {time.time() - t0:.0f} s")
 
 
-def build_inputs(X, names, variant, rng):
+def build_inputs(X, names, variant, rng, variants=None):
     """Exposed 8-bit-like inputs (N, C, 60, 80) for a lighting variant."""
     idx = {k: i for i, k in enumerate(names)}
-    chans = [X[:, [idx[k] for k in ch]].astype(np.float32).sum(1) for ch in VARIANTS[variant]]
+    chans = [X[:, [idx[k] for k in ch]].astype(np.float32).sum(1) for ch in (variants or VARIANTS)[variant]]
     stack = np.stack(chans, 1)
     # one locked exposure per sample over all channels (98th percentile of the brightest channel)
     scale = np.percentile(stack.max(1).reshape(len(X), -1), 98, axis=1)[:, None, None, None]
@@ -217,55 +236,64 @@ def build_inputs(X, names, variant, rng):
     return np.round(np.clip(img, 0, 1) * 255) / 255
 
 
-def train_variants(epochs):
+def train_one(X, Y, names, variant, trn, va, epochs, seed, dev, variants=None):
+    """Train train.MouthNet on one lighting variant -> per-label val MAE (best of the last epochs)."""
     import torch
     import torch.nn.functional as F
     import train as tr
-    d = np.load(OUT / "data.npz")
+    torch.manual_seed(seed)
+    Xi = build_inputs(X, names, variant, np.random.default_rng(1), variants)
+    c_in = Xi.shape[1]
+    model = tr.MouthNet(n_out=len(LABELS), width=(8, 12, 16, 24, 32)).to(dev)
+    if c_in != 1:
+        first = model.features[0]
+        model.features[0] = torch.nn.Conv2d(c_in, first.out_channels, 3, padding=1, bias=False).to(dev)
+    xt = torch.tensor(Xi[trn], dtype=torch.float32, device=dev)
+    yt = torch.tensor(Y[trn], device=dev)
+    xv = torch.tensor(Xi[va], dtype=torch.float32, device=dev)
+    yv = Y[va]
+    opt = torch.optim.AdamW(model.parameters(), 3e-3, weight_decay=1e-4)
+    steps = epochs * (len(xt) // 64)
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, 3e-3, total_steps=steps)
+    best = None
+    for ep in range(epochs):
+        model.train()
+        p = torch.randperm(len(xt), device=dev)
+        for a in range(0, len(xt) - 63, 64):
+            i = p[a:a + 64]
+            loss = F.mse_loss(model(xt[i]), yt[i])
+            opt.zero_grad(); loss.backward(); opt.step(); sched.step()
+        if ep >= epochs - 10 or ep % 10 == 0:
+            model.eval()
+            with torch.no_grad():
+                pv = model(xv).cpu().numpy()
+            mae = np.abs(pv - yv).mean(0)
+            if best is None or mae.mean() < best.mean():
+                best = mae
+    return best
+
+
+def train_variants(epochs, only=None, seeds=(0,), out_name="report.txt", set_name="main"):
+    import torch
+    _, variants, fname = SETS[set_name]
+    d = np.load(OUT / fname)
     X, Y, names = d["X"], d["Y"], list(d["leds"])
     n = len(X)
-    rng = np.random.default_rng(0)
-    perm = rng.permutation(n)
+    perm = np.random.default_rng(0).permutation(n)
     n_val = n // 5
     va, trn = perm[:n_val], perm[n_val:]
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    lines = [f"{n} synthetic samples ({len(trn)} train / {n_val} val), {epochs} epochs, net width 8,12,16,24,32",
+    lines = [f"{n} synthetic samples ({len(trn)} train / {n_val} val), {epochs} epochs, net width 8,12,16,24,32, "
+             f"seeds {list(seeds)} (mean; +- = std of the 'all' column over seeds)",
              "val MAE per label (0..1 scale); lower is better", "",
-             f"{'variant':16s} {'all':>6s} " + " ".join(f"{l:>8s}" for l in LABELS)]
-    for variant in VARIANTS:
-        torch.manual_seed(0)
-        Xi = build_inputs(X, names, variant, np.random.default_rng(1))
-        c_in = Xi.shape[1]
-        model = tr.MouthNet(n_out=len(LABELS), width=(8, 12, 16, 24, 32)).to(dev)
-        if c_in != 1:
-            first = model.features[0]
-            model.features[0] = torch.nn.Conv2d(c_in, first.out_channels, 3, padding=1, bias=False).to(dev)
-        xt = torch.tensor(Xi[trn], dtype=torch.float32, device=dev)
-        yt = torch.tensor(Y[trn], device=dev)
-        xv = torch.tensor(Xi[va], dtype=torch.float32, device=dev)
-        yv = Y[va]
-        opt = torch.optim.AdamW(model.parameters(), 3e-3, weight_decay=1e-4)
-        steps = epochs * (len(xt) // 64)
-        sched = torch.optim.lr_scheduler.OneCycleLR(opt, 3e-3, total_steps=steps)
-        best = None
-        for ep in range(epochs):
-            model.train()
-            p = torch.randperm(len(xt), device=dev)
-            for a in range(0, len(xt) - 63, 64):
-                i = p[a:a + 64]
-                loss = F.mse_loss(model(xt[i]), yt[i])
-                opt.zero_grad(); loss.backward(); opt.step(); sched.step()
-            if ep >= epochs - 10 or ep % 10 == 0:
-                model.eval()
-                with torch.no_grad():
-                    pv = model(xv).cpu().numpy()
-                mae = np.abs(pv - yv).mean(0)
-                if best is None or mae.mean() < best.mean():
-                    best = mae
-        line = f"{variant:16s} {best.mean():6.3f} " + " ".join(f"{m:8.3f}" for m in best)
+             f"{'variant':20s} {'all':>6s} {'+-':>6s} " + " ".join(f"{l:>8s}" for l in LABELS)]
+    for variant in (only or variants):
+        runs = np.array([train_one(X, Y, names, variant, trn, va, epochs, seed, dev, variants) for seed in seeds])
+        mean = runs.mean(0)
+        line = f"{variant:20s} {mean.mean():6.3f} {runs.mean(1).std():6.3f} " + " ".join(f"{m:8.3f}" for m in mean)
         lines.append(line)
         print(line, flush=True)
-    (OUT / "report.txt").write_text("\n".join(lines) + "\n")
+    (OUT / out_name).write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
 
@@ -274,11 +302,16 @@ def main():
     ap.add_argument("cmd", choices=["render", "train"])
     ap.add_argument("--n", type=int, default=3000)
     ap.add_argument("--epochs", type=int, default=60)
+    ap.add_argument("--variants", default=None, help="comma list of variant names (default all)")
+    ap.add_argument("--seeds", default="0", help="comma list of training seeds")
+    ap.add_argument("--report", default="report.txt")
+    ap.add_argument("--set", default="main", choices=list(SETS))
     args = ap.parse_args()
     if args.cmd == "render":
-        render(args.n)
+        render(args.n, args.set)
     else:
-        train_variants(args.epochs)
+        only = args.variants.split(",") if args.variants else None
+        train_variants(args.epochs, only, tuple(int(v) for v in args.seeds.split(",")), args.report, args.set)
 
 
 if __name__ == "__main__":

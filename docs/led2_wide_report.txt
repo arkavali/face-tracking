@@ -1,0 +1,23 @@
+wall albedo rho = 0.5; camera at [ 0. 30. 55.] (x, up, forward from the mouth slit); score = mean log separation - 2 x dark share (see ledsim.py)
+positions: from the slit | from the camera
+
+baseline LED at the lens: score -1.90 (sep -0.75, dark 0.57)
+
+== best h-pair
+  -0.96 (sep -0.66, min -2.81, dark 0.15)  (+65,+10,69) + (-65,+10,69)  |  (+65,-20,+14) + (-65,-20,+14)
+  -0.98 (sep -0.66, min -2.60, dark 0.16)  (+65,+10,59) + (-65,+10,59)  |  (+65,-20,+4) + (-65,-20,+4)
+  -0.99 (sep -0.56, min -2.60, dark 0.22)  (+55,+10,59) + (-55,+10,59)  |  (+55,-20,+4) + (-55,-20,+4)
+  -0.99 (sep -0.65, min -2.87, dark 0.17)  (+65,+0,69) + (-65,+0,69)  |  (+65,-30,+14) + (-65,-30,+14)
+  -1.00 (sep -0.59, min -2.78, dark 0.21)  (+55,+10,69) + (-55,+10,69)  |  (+55,-20,+14) + (-55,-20,+14)
+
+== same layouts without the wall bounce (rho = 0) / with a light wall (rho = 0.8)
+  h-pair  rho 0: -0.93 (dark 0.15)   rho 0.5: -0.96 (dark 0.15)   rho 0.8: -0.98 (dark 0.14)
+  lens    rho 0: -1.93 (dark 0.58)   rho 0.5: -1.90 (dark 0.57)
+
+== blinking: LED A frame + LED B frame as 2 channels (locked exposure) vs both on, sep mean / min
+  h-pair (+65,+10,69) + (-65,+10,69): both -0.66 / -2.81   2ch -0.85 / -2.96
+  h-pair (+65,+10,59) + (-65,+10,59): both -0.66 / -2.60   2ch -0.87 / -2.97
+  h-pair (+55,+10,59) + (-55,+10,59): both -0.56 / -2.60   2ch -0.72 / -2.79
+  h-pair (+65,+0,69) + (-65,+0,69): both -0.65 / -2.87   2ch -0.81 / -2.92
+  h-pair (+55,+10,69) + (-55,+10,69): both -0.59 / -2.78   2ch -0.73 / -2.83
+  h-pair (+65,+0,59) + (-65,+0,59): both -0.65 / -2.83   2ch -0.83 / -2.92
