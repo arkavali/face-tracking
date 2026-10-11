@@ -15,11 +15,17 @@
 //   mode stream|track     JPEG streaming (default) or on-chip tracking
 //   preview N             track mode: send the 80x60 net input every N-th frame (0 = off, default 2)
 //   bench                 track mode: time downscale + net on the current frame
+//   fit zero [N]          per-wearing adjustment: neutral face, average N frames (default 20)
+//   fit max [S]           per-wearing adjustment: for S seconds (default 8) make every expression as
+//                         strongly as possible; the per-channel maximum becomes 1.0
+//   fit on|off|clear|show use / ignore / forget / print the adjustment (kept in NVS)
 // Frame: "JPG seq w h len ms\n" + len bytes of JPEG.
-// Track: "MOUTH seq ms net_ms v0 .. v21\n" (values x1000, channel order: "CH" line after mode track)
+// Track: "MOUTH seq ms net_ms fit v0 .. v21\n" (values x1000, channel order: "CH" line after mode
+//        track; fit = 1 when the values are adjusted: (raw - zero) / (max - zero), clipped 0..1)
 //        and "PRV seq 80 60 4800\n" + 4800 grey bytes when preview is on.
 // Text replies start with other words.
 #include <Arduino.h>
+#include <Preferences.h>
 
 #include "camera_pins.h"
 #include "esp_camera.h"
@@ -43,6 +49,64 @@ float* netB = nullptr;
 uint8_t small[80 * 60];
 float netOut[32];
 float netMs = 0;
+
+// Per-wearing adjustment: the mask sits a little differently every time, so the net's neutral
+// output is not exactly 0 and the strongest expression not exactly 1.
+float fitZero[32], fitMax[32], smooth[32];
+bool fitOn = false, fitHave = false;
+int fitZeroLeft = 0, fitZeroN = 0;
+uint32_t fitMaxUntil = 0;
+float zeroAcc[32];
+Preferences prefs;
+
+void fitSave() {
+  prefs.putInt("n", mouth::outputCount());
+  prefs.putBytes("zero", fitZero, sizeof(float) * mouth::outputCount());
+  prefs.putBytes("max", fitMax, sizeof(float) * mouth::outputCount());
+  prefs.putBool("on", fitOn);
+}
+
+void fitLoad() {
+  if (prefs.getInt("n", 0) != mouth::outputCount()) return;
+  prefs.getBytes("zero", fitZero, sizeof(float) * mouth::outputCount());
+  prefs.getBytes("max", fitMax, sizeof(float) * mouth::outputCount());
+  fitOn = prefs.getBool("on", false);
+  fitHave = true;
+}
+
+void fitUpdate(const float* raw) {
+  const int n = mouth::outputCount();
+  for (int i = 0; i < n; ++i) smooth[i] = 0.5f * smooth[i] + 0.5f * raw[i];
+  if (fitZeroLeft > 0) {
+    for (int i = 0; i < n; ++i) zeroAcc[i] += raw[i];
+    if (--fitZeroLeft == 0) {
+      for (int i = 0; i < n; ++i) {
+        fitZero[i] = zeroAcc[i] / fitZeroN;
+        if (!fitHave || fitMax[i] < fitZero[i] + 0.05f) fitMax[i] = 1.0f;
+      }
+      fitHave = fitOn = true;
+      fitSave();
+      Serial.println("INFO fit zero done");
+    }
+  }
+  if (fitMaxUntil) {
+    for (int i = 0; i < n; ++i)
+      if (smooth[i] > fitMax[i]) fitMax[i] = smooth[i];
+    if ((int32_t)(millis() - fitMaxUntil) >= 0) {
+      fitMaxUntil = 0;
+      fitHave = fitOn = true;
+      fitSave();
+      Serial.println("INFO fit max done");
+    }
+  }
+}
+
+float fitted(int i, float v) {
+  if (!fitOn || !fitHave) return v;
+  const float span = fitMax[i] - fitZero[i];
+  if (span < 0.05f) return max(0.0f, v - fitZero[i]);
+  return constrain((v - fitZero[i]) / span, 0.0f, 1.0f);
+}
 
 float* allocFloats(size_t n) {
   // internal RAM is several times faster than PSRAM on the classic ESP32; PSRAM as a fallback
@@ -117,7 +181,7 @@ void handleCommand(String cmd) {
   sensor_t* sen = esp_camera_sensor_get();
   if (w == "help") {
     Serial.println("INFO stream on|off, size qvga|cif|vga, q N, gray on|off, exp auto|N, led N, reg ADDR [VAL], "
-                   "status, mode stream|track, preview N, bench");
+                   "status, mode stream|track, preview N, bench, fit zero|max|on|off|clear|show");
   } else if (w == "stream" && n == 2) {
     streaming = a == "on";
   } else if (w == "size" && n == 2) {
@@ -170,6 +234,33 @@ void handleCommand(String cmd) {
       for (int i = 0; i < mouth::outputCount(); ++i) Serial.printf(" %s", mouth::channelName(i));
       Serial.println();
     }
+  } else if (w == "fit" && n >= 2) {
+    const int nOut = mouth::outputCount();
+    if (a == "zero") {
+      int frames = 20;
+      sscanf(cmd.c_str(), "%*s %*s %d", &frames);
+      fitZeroN = fitZeroLeft = constrain(frames, 1, 200);
+      for (int i = 0; i < nOut; ++i) zeroAcc[i] = 0;
+      Serial.printf("INFO fit zero: keep a neutral face for %d frames\n", fitZeroN);
+    } else if (a == "max") {
+      int sec = 8;
+      sscanf(cmd.c_str(), "%*s %*s %d", &sec);
+      if (!fitHave)
+        for (int i = 0; i < nOut; ++i) fitZero[i] = 0;
+      for (int i = 0; i < nOut; ++i) fitMax[i] = fitZero[i];
+      fitMaxUntil = millis() + 1000u * constrain(sec, 1, 60);
+      Serial.printf("INFO fit max: make every expression strongly for %d s\n", sec);
+    } else if (a == "on" || a == "off") {
+      fitOn = a == "on" && fitHave;
+      prefs.putBool("on", fitOn);
+    } else if (a == "clear") {
+      fitHave = fitOn = false;
+      prefs.clear();
+    }
+    Serial.printf("FIT %s", fitOn ? "on" : fitHave ? "off" : "none");
+    for (int i = 0; i < nOut && fitHave; ++i)
+      Serial.printf(" %s:%d-%d", mouth::channelName(i), (int)(fitZero[i] * 1000), (int)(fitMax[i] * 1000));
+    Serial.println();
   } else if (w == "preview" && n == 2) {
     previewEvery = max(0, (int)a.toInt());
   } else if (w == "bench") {
@@ -199,6 +290,8 @@ void setup() {
   pinMode(kLedPin, OUTPUT);
   analogWrite(kLedPin, 0);
   if (!initCamera()) Serial.println("ERR camera init failed");
+  prefs.begin("mouthfit", false);
+  fitLoad();
   fpsT0 = millis();
   Serial.println("INFO mouth camera ready");
 }
@@ -236,10 +329,12 @@ void loop() {
     uint32_t t0 = micros();
     mouth::run(small, netA, netB, netOut);
     netMs = (micros() - t0) / 1000.0f;
+    fitUpdate(netOut);
     char buf[256];
-    int len = snprintf(buf, sizeof(buf), "MOUTH %u %u %.1f", seq, (unsigned)lastFrameMs, netMs);
+    int len = snprintf(buf, sizeof(buf), "MOUTH %u %u %.1f %d", seq, (unsigned)lastFrameMs, netMs,
+                       (fitOn && fitHave) ? 1 : 0);
     for (int i = 0; i < mouth::outputCount() && len < (int)sizeof(buf) - 8; ++i)
-      len += snprintf(buf + len, sizeof(buf) - len, " %d", (int)(netOut[i] * 1000 + 0.5f));
+      len += snprintf(buf + len, sizeof(buf) - len, " %d", (int)(fitted(i, netOut[i]) * 1000 + 0.5f));
     Serial.println(buf);
     if (previewEvery && seq % previewEvery == 0) {
       Serial.printf("PRV %u 80 60 4800\n", seq);

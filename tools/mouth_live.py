@@ -3,7 +3,8 @@
   python mouth_live.py [COMx] [--smooth 0.5] [--babble] [--board]
 --babble adds the Babble face model's matching channels as thin bars for comparison.
 --board runs the net ON THE ESP32 (firmware "mode track"): bars show the board's values, the
-picture is the 80x60 net input the board sends back.
+picture is the 80x60 net input the board sends back. Per-wearing adjustment keys (board only):
+Z neutral face (zero), M 8 s of strongest expressions (max), F adjustment on/off.
 Keys: L cycle the flash LED (starts at --led, default dim), Q/Esc quit.
 """
 from __future__ import annotations
@@ -57,6 +58,8 @@ def run_board(st, names, args):
     val = np.zeros(len(names), np.float32)
     view = np.zeros((480, 640, 3), np.uint8)
     t_last, n_fps, fps, net_ms = time.time(), 0, 0.0, 0.0
+    fit_on, msg, msg_t = False, "", 0.0
+    st.send("fit show")
     try:
         for head, data in st.frames():
             if head is not None:
@@ -67,20 +70,25 @@ def run_board(st, names, args):
                 view = cv2.cvtColor(cv2.resize(img, (640, 480), interpolation=cv2.INTER_NEAREST), cv2.COLOR_GRAY2BGR)
             elif data.startswith("MOUTH"):
                 parts = data.split()
-                if len(parts) != 4 + len(names):
+                if len(parts) != 5 + len(names):
                     continue
                 net_ms = float(parts[3])
-                y = np.array([int(v) for v in parts[4:]], np.float32) / 1000
+                fit_on = parts[4] == "1"
+                y = np.array([int(v) for v in parts[5:]], np.float32) / 1000
                 val = args.smooth * val + (1 - args.smooth) * y
                 n_fps += 1
                 if time.time() - t_last >= 1:
                     fps, n_fps, t_last = n_fps / (time.time() - t_last), 0, time.time()
             else:
                 print(data)
+                if data.startswith("INFO fit"):
+                    msg, msg_t = data[5:], time.time()
                 continue
             frame = view.copy()
-            cv2.putText(frame, f"ON BOARD: {fps:.1f} fps, net {net_ms:.0f} ms, LED {led[led_i]}", (8, 22), 0, 0.6,
-                        (0, 255, 0), 2)
+            cv2.putText(frame, f"ON BOARD: {fps:.1f} fps, net {net_ms:.0f} ms, LED {led[led_i]}, "
+                        f"fit {'on' if fit_on else 'off'}", (8, 22), 0, 0.6, (0, 255, 0), 2)
+            if time.time() - msg_t < 10:
+                cv2.putText(frame, msg, (8, 470), 0, 0.6, (0, 200, 255), 2)
             cv2.imshow("mouth live", np.hstack([frame, draw_bars(names, val, frame.shape[0])]))
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
@@ -88,6 +96,12 @@ def run_board(st, names, args):
             if key == ord("l"):
                 led_i = (led_i + 1) % len(led)
                 st.send(f"led {led[led_i]}")
+            if key == ord("z"):
+                st.send("fit zero 20")
+            if key == ord("m"):
+                st.send("fit max 8")
+            if key == ord("f"):
+                st.send("fit off" if fit_on else "fit on")
     finally:
         st.send("mode stream")   # leave the board as the other tools expect it
 
