@@ -125,3 +125,17 @@ Layout score = how far apart the shapes stay in the 80x60 net input relative to 
   the other. Costs half the frame rate per source. Two-wavelength separation does not work (OV2640
   Bayer filters are nearly equal in NIR). Mouth LEDs may be brighter than eye LEDs, aimed away from
   the eyes and glasses.
+  Decided form (user, 2026-10-11): two full frames (L lit, R lit) as two input channels, sliding
+  pairs so the output keeps the camera rate; row-striped frames rejected (much harder, no gain).
+  The net only grows in its first layer (+16 % MAC). Open points: frame/LED tagging, switching in
+  vertical blanking, locked exposure, ambient (dark) frame, recorder for pairs, LED drivers, a
+  fallback when one LED fails.
+  **Simulation check (`tools/ledsim2ch.py`, `led_report_2ch.txt`): no gain.** With 15 random
+  +-5 mm mask shifts, L/R as two channels (common or separate exposure) or a (L-R)/(L+R) ratio
+  channel separate the shapes no better than both side LEDs on at once (mean log separation
+  -0.65..-1.09 vs -0.52..-0.63; nearest-centroid accuracy 0.46-0.58 vs 0.59-0.65), also with a
+  random albedo pattern and +-15 % LED gain noise, which is where photometric stereo should help.
+  The mask-shift spread dominates and the ratio image is very sensitive to it. Caveats: rough
+  synthetic shapes, uniform skin, linear / nearest-centroid metrics instead of a trained net.
+  Conclusion: side pair lit together by default; alternation only as a cheap hardware experiment
+  later (e.g. one LED steady, one blinking) once the mask exists.
