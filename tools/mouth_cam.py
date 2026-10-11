@@ -8,6 +8,8 @@ A recording is frames.mjpeg (concatenated JPEGs) + frames.csv (seq, device ms, P
 from __future__ import annotations
 
 import argparse
+import queue
+import threading
 import sys
 import time
 from pathlib import Path
@@ -35,8 +37,21 @@ class Stream:
         self.s.dtr = False      # set before open: keeps the board out of reset / boot mode
         self.s.rts = False
         self.s.open()
+        try:
+            self.s.set_buffer_size(rx_size=1 << 20)   # Windows default 4 KB overflows at 90 KB/s
+        except Exception:
+            pass
         self.buf = b""
         self.bad = 0
+        # a reader thread drains the port so a slow window or disk write never drops bytes
+        self.q = queue.Queue()
+        threading.Thread(target=self._reader, daemon=True).start()
+
+    def _reader(self):
+        while True:
+            chunk = self.s.read(max(1, self.s.in_waiting))
+            if chunk:
+                self.q.put(chunk)
 
     def send(self, cmd):
         self.s.write((cmd + "\n").encode())
@@ -44,10 +59,10 @@ class Stream:
     def frames(self):
         """Yields (header fields, jpeg bytes) or (None, text line)."""
         while True:
-            chunk = self.s.read(max(1, self.s.in_waiting))
-            if not chunk:
-                continue
-            self.buf += chunk
+            parts = [self.q.get()]
+            while not self.q.empty():
+                parts.append(self.q.get_nowait())
+            self.buf += b"".join(parts)
             while True:
                 nl = self.buf.find(b"\n")
                 if nl < 0:

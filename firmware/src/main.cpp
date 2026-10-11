@@ -5,7 +5,8 @@
 //   help                  this list
 //   stream on|off         send frames (on after power-up)
 //   size qvga|cif|vga     frame size (320x240 default, 400x296, 640x480)
-//   q N                   JPEG quality 4..63 (lower = better, bigger; default 12)
+//   q N                   JPEG quality 4..63 (lower = better, bigger; default 14)
+//   gray on|off           grey picture (default on: smaller JPEG, more fps)
 //   exp auto|N            exposure: automatic, or fixed N lines with auto gain
 //   led N                 flash LED (GPIO 4) PWM 0..255, 0 = off
 //   reg ADDR [VALUE]      read / write a camera register (hex, debugging)
@@ -20,7 +21,8 @@ namespace {
 
 constexpr int kLedPin = 4;
 bool streaming = true;
-int quality = 12;
+int quality = 14;
+bool gray = true;
 framesize_t frameSize = FRAMESIZE_QVGA;
 uint32_t seq = 0, fpsFrames = 0, fpsT0 = 0, bytesSum = 0, camRestarts = 0, lastFrameMs = 0;
 float fps = 0, avgBytes = 0;
@@ -55,6 +57,10 @@ bool initCamera() {
   c.grab_mode = CAMERA_GRAB_LATEST;
   if (esp_camera_init(&c) != ESP_OK) return false;
   esp_log_level_set("cam_hal", ESP_LOG_NONE);  // driver log lines would land inside JPEG data
+  // Grey picture: the IR image has no colour anyway, and without chroma the JPEG is ~30 %
+  // smaller, which is what limits the frame rate on the 921600-baud link.
+  sensor_t* sen = esp_camera_sensor_get();
+  if (sen) sen->set_special_effect(sen, gray ? 2 : 0);
   return true;
 }
 
@@ -83,7 +89,7 @@ void handleCommand(String cmd) {
   String w(word), a(arg);
   sensor_t* sen = esp_camera_sensor_get();
   if (w == "help") {
-    Serial.println("INFO stream on|off, size qvga|cif|vga, q N, exp auto|N, led N, reg ADDR [VAL], status");
+    Serial.println("INFO stream on|off, size qvga|cif|vga, q N, gray on|off, exp auto|N, led N, reg ADDR [VAL], status");
   } else if (w == "stream" && n == 2) {
     streaming = a == "on";
   } else if (w == "size" && n == 2) {
@@ -99,6 +105,9 @@ void handleCommand(String cmd) {
       sen->set_exposure_ctrl(sen, 0);
       sen->set_aec_value(sen, a.toInt());
     }
+  } else if (w == "gray" && n == 2) {
+    gray = a == "on";
+    if (sen) sen->set_special_effect(sen, gray ? 2 : 0);
   } else if (w == "led" && n == 2) {
     analogWrite(kLedPin, constrain(a.toInt(), 0, 255));
   } else if (w == "reg" && n >= 2 && sen) {
