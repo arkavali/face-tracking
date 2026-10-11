@@ -29,6 +29,7 @@ import ledsim
 import lipshapes
 import rt
 import sweep
+import synth
 from gpu import cp
 from scene import Scene, to_np
 
@@ -60,10 +61,13 @@ def wall_patches(mask_tris, rng):
     return c[pick], n[pick], a[idx].sum() / len(pick)
 
 
+XS = (0.0, 10.0, 20.0, 30.0, 45.0)
+
+
 def candidates(mask_sc, face):
     xs_, ys_, fz = face
     pts = []
-    for x in (0.0, 10.0, 20.0, 30.0, 45.0):
+    for x in XS:
         for y in np.arange(SLIT[1] - 40, SLIT[1] + 61, 10.0):
             for z in np.arange(265.0, FAN_Z + 1, 10.0):
                 fzv = fz[np.argmin(abs(ys_ - y)), np.argmin(abs(xs_ - x))]
@@ -122,7 +126,14 @@ def small(img):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rho", type=float, default=0.5, help="inner wall albedo in NIR")
+    ap.add_argument("--xs", default=None, help="x positions to try, e.g. 45,55,65,75 (default 0,10,20,30,45)")
+    ap.add_argument("--hpairs-only", action="store_true", help="only horizontal pairs (fast)")
+    ap.add_argument("--out", default="led2")
     args = ap.parse_args()
+    global XS, OUT
+    if args.xs:
+        XS = tuple(float(v) for v in args.xs.split(","))
+    OUT = OUT.parent / args.out
     OUT.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     rng = np.random.default_rng(3)
@@ -143,13 +154,14 @@ def main():
     indir = {n: np.zeros((len(full), len(SHIFTS), H, W), np.float16) for n in names}
     roi = None
     for name, verts in shapes.items():
-        ss = ledsim.ShapeScene(verts, faces, lipw, mask_tris, base=shapes["neutral"])
+        ss = ledsim.ShapeScene(verts, faces, lipw, mask_tris, base=shapes["neutral"], fast_shadows=True)
         for si, sh in enumerate(SHIFTS):
             g = ss.primary(CAM + sh, ledsim.camera_rays(CAM + sh, AIM + sh))
             if roi is None:
                 roi = to_np(g["hit"]).reshape(H, W) & (to_np(g["p"][:, 1]).reshape(H, W) < 125)
-            for k, led in enumerate(full):
-                direct[name][k, si] = to_np(ss.shade(g, led + sh, AIM + sh)).reshape(H, W)
+            for a in range(0, len(full), 48):      # all LEDs of a chunk in one shadow-ray launch
+                img = synth.shade_all(ss, g, full[a:a + 48] + sh, AIM + sh)
+                direct[name][a:a + 48, si] = to_np(img).reshape(-1, H, W)
             ind = to_np(bounce(ss, g, full, sh, pc, pn, pa))
             indir[name][:, si] = ind.T.reshape(len(full), H, W)
         print(f"  {name}: {time.time() - t0:.0f} s", flush=True)
@@ -171,11 +183,11 @@ def main():
     hpairs = sorted({tuple(sorted((k, mirror[k]))) for k in range(len(full)) if full[k][0] > 0})
     layouts = [("lens", (cam_led,))] + [("centre", (k,)) for k in centres if k != cam_led]
     layouts += [("h-pair", p) for p in hpairs]
-    vpairs = [(a, b) for a, b in itertools.combinations(centres, 2) if abs(full[a][1] - full[b][1]) >= 20]
+    vpairs = [] if args.hpairs_only else         [(a, b) for a, b in itertools.combinations(centres, 2) if abs(full[a][1] - full[b][1]) >= 20]
     layouts += [("v-pair", p) for p in vpairs]
     near_cam = [k for k in centres if np.linalg.norm(full[k] - CAM) < 30 and k != cam_led] + [cam_led]
     nose_gap = [k for k in centres if 25 <= rel(full[k])[1] <= 50 and 20 <= rel(full[k])[2] <= 50]
-    for a, b in itertools.combinations(near_cam, 2):
+    for a, b in ([] if args.hpairs_only else itertools.combinations(near_cam, 2)):
         if abs(full[a][1] - full[b][1]) >= 12:
             layouts += [("triple", (a, b, c)) for c in nose_gap if c not in (a, b)]
     print(f"{len(layouts)} layouts to score", flush=True)
@@ -183,8 +195,6 @@ def main():
     for kind, leds in layouts:
         mean, mn, dark, seps = evaluate(leds)
         res.append(dict(kind=kind, leds=tuple(leds), mean=mean, min=mn, dark=dark, seps=seps, score=mean - 2 * dark))
-    best_h = max((r for r in res if r["kind"] == "h-pair"), key=lambda r: r["score"])
-    best_v = max((r for r in res if r["kind"] == "v-pair"), key=lambda r: r["score"])
     for hp in sorted((r for r in res if r["kind"] == "h-pair"), key=lambda r: -r["score"])[:5]:
         for vp in sorted((r for r in res if r["kind"] == "v-pair"), key=lambda r: -r["score"])[:5]:
             leds = tuple(sorted(set(hp["leds"] + vp["leds"])))

@@ -24,6 +24,7 @@ import numpy as np
 import ledsim
 import ledsweep2
 import lipshapes
+import rt
 from gpu import cp
 from scene import Scene, to_np
 
@@ -46,6 +47,7 @@ LEDS = {
     "down_cam": rel_to_world(0, 15, 55),
     "sideL_mid": rel_to_world(30, 5, 55), "sideR_mid": rel_to_world(-30, 5, 55),
     "sideL_low": rel_to_world(45, -9, 64), "sideR_low": rel_to_world(-45, -9, 64),
+    "v_front": rel_to_world(0, 0, 69), "v_above_nose": rel_to_world(0, 60, 29),   # best v-pair, ledsweep2
 }
 VARIANTS = {   # name: list of channels, each channel = list of LEDs summed
     "lens": [["lens"]],
@@ -63,6 +65,9 @@ VARIANTS = {   # name: list of channels, each channel = list of LEDs summed
     "blink side mid": [["sideL_mid"], ["sideR_mid"]],
     "blink cam vertical": [["up_cam"], ["down_cam"]],
     "blink side 4ch": [["sideL_near"], ["sideR_near"], ["sideL_far"], ["sideR_far"]],
+    "v-pair (sweep best)": [["v_front", "v_above_nose"]],
+    "cross (sweep best)": [["v_front", "v_above_nose", "sideL_far", "sideR_far"]],
+    "blink v-pair": [["v_front"], ["v_above_nose"]],
 }
 
 
@@ -109,6 +114,63 @@ def sample_weights(rng):
     return w
 
 
+def camera_rays(cam, aim, w=80, h=60):
+    """ledsim.camera_rays at the net's own 80x60 (4x fewer rays than the 160x120 sweep renders)."""
+    import sweep
+    model, fov = ledsim.LENS
+    f = sweep.lens_f(model, fov) * w / sweep.W
+    fwd = (aim - cam) / np.linalg.norm(aim - cam)
+    right = np.cross(fwd, [0, 1, 0]); right /= np.linalg.norm(right)
+    up = np.cross(right, fwd)
+    u, v = np.meshgrid(np.arange(w) + 0.5 - w / 2, h / 2 - (np.arange(h) + 0.5))
+    th = np.hypot(u, v) / f
+    ph = np.arctan2(v, u)
+    d = (np.sin(th) * np.cos(ph))[..., None] * right + (np.sin(th) * np.sin(ph))[..., None] * up         + np.cos(th)[..., None] * fwd
+    return d.reshape(-1, 3)
+
+
+def shade_all(ss, g, leds, aim):
+    """ledsim.ShapeScene.shade for all LEDs in one kernel launch -> (K, N) radiance."""
+    K, N = len(leds), g["p"].shape[0]
+    lp = cp.asarray(leds, dtype=cp.float32)
+    L = lp[:, None] - g["p"][None]                                    # (K, N, 3)
+    dist = cp.linalg.norm(L, axis=2)
+    l = L / cp.maximum(dist[..., None], 1e-6)
+    n = g["n"][None]
+    ndl = cp.clip((n * l).sum(2), 0, None)
+    o = cp.broadcast_to(g["p"] + g["n"] * 0.15, (K, N, 3)).reshape(-1, 3)
+    _, i, _, _ = rt.cast(ss.s0, ss.s1, ss.s2, o, l.reshape(-1, 3), tmax=(dist - 0.5).reshape(-1))
+    lit = (i.reshape(K, N) < 0) & g["hit"][None] & (ndl > 0)
+    ax = cp.asarray(aim, dtype=cp.float32)[None] - lp
+    ax /= cp.linalg.norm(ax, axis=1, keepdims=True)
+    beam = cp.clip((-l * ax[:, None]).sum(2), 0, None) ** ledsim.BEAM_M
+    h = l - g["d"][None]
+    h /= cp.maximum(cp.linalg.norm(h, axis=2, keepdims=True), 1e-6)
+    spec = ledsim.SPEC * g["spec"][None] * cp.clip((n * h).sum(2), 0, None) ** ledsim.SHININESS
+    e = beam * lit / cp.maximum(dist, 5.0) ** 2 * 1e4
+    return (g["alb"][None] * ndl + spec) * e
+
+
+def bounce_fast(g, leds, sh, aim, pc, pn, pa):
+    """ledsweep2.bounce without the LED -> wall shadow test, all LEDs at once (LEDs sit inside the
+    beak and see almost all of its inner wall)."""
+    pcs, pns = cp.asarray(pc, dtype=cp.float32), cp.asarray(pn, dtype=cp.float32)
+    L = cp.asarray(leds + sh, dtype=cp.float32)[None] - pcs[:, None]           # (M, K, 3)
+    d = cp.linalg.norm(L, axis=2)
+    l = L / d[..., None]
+    cosm = cp.clip((pns[:, None] * l).sum(2), 0, None)
+    ax = cp.asarray(aim - (leds + sh), dtype=cp.float32)
+    ax /= cp.linalg.norm(ax, axis=1, keepdims=True)
+    beam = cp.clip((-l * ax[None]).sum(2), 0, None) ** ledsim.BEAM_M
+    B = beam * cosm / cp.maximum(d, 5.0) ** 2 * 1e4 * (pa / np.pi)
+    P, n_p = g["p"], g["n"]
+    w = pcs[None] - P[:, None]
+    r2 = cp.maximum((w * w).sum(-1), 100.0)
+    r = cp.sqrt(r2)
+    G = cp.clip((n_p[:, None] * w).sum(-1) / r, 0, None) * cp.clip(-(pns[None] * w).sum(-1) / r, 0, None) / r2
+    return (G @ B) * g["alb"][:, None]
+
+
 def render(n):
     OUT.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(7)
@@ -116,6 +178,7 @@ def render(n):
     B = bases(base)
     lipw = lipshapes.lip_weight(base)
     mask_tris = Scene(("mask",)).tris
+    ledsweep2.N_PATCH = 600            # the bounce is a small, smooth term: fewer wall patches suffice
     pc, pn, pa = ledsweep2.wall_patches(mask_tris, np.random.default_rng(3))
     names = list(LEDS)
     leds = np.array([LEDS[k] for k in names])
@@ -125,18 +188,16 @@ def render(n):
     for s in range(n):
         w = sample_weights(rng)
         v = base + sum(wi * bi for wi, bi in zip(w, B) if wi > 0) if w.any() else base
-        ss = ledsim.ShapeScene(v, faces, lipw, mask_tris, base=base)
+        ss = ledsim.ShapeScene(v, faces, lipw, mask_tris, base=base, fast_shadows=True)
         sh = rng.uniform(-5, 5, 3)
         aim = ledsim.AIM + sh + rng.uniform(-3, 3, 3)
         cam = ledsim.CAM + sh
-        g = ss.primary(cam, ledsim.camera_rays(cam, aim))
-        tex = cv2.resize(rng.normal(0, 1, (6, 8)).astype(np.float32), (ledsim.W, ledsim.H), interpolation=cv2.INTER_CUBIC)
+        g = ss.primary(cam, camera_rays(cam, aim))
+        tex = cv2.resize(rng.normal(0, 1, (6, 8)).astype(np.float32), (80, 60), interpolation=cv2.INTER_CUBIC)
         tex = np.clip(1 + 0.25 * tex, 0.4, 1.8)
-        ind = to_np(ledsweep2.bounce(ss, g, leds, sh, pc, pn, pa))
-        for k, led in enumerate(leds):
-            img = to_np(ss.shade(g, led + sh, aim)) + 0.5 * ind[:, k]
-            img = img.reshape(ledsim.H, ledsim.W) * tex * rng.uniform(0.85, 1.15)
-            X[s, k] = img.reshape(60, 2, 80, 2).mean((1, 3))
+        img = shade_all(ss, g, leds + sh, aim) + 0.5 * bounce_fast(g, leds, sh, aim, pc, pn, pa).T
+        img = to_np(img).reshape(len(leds), 60, 80)
+        X[s] = img * tex[None] * rng.uniform(0.85, 1.15, (len(leds), 1, 1))
         Y[s] = w
         if s % 200 == 0:
             print(f"  {s}/{n}  {time.time() - t0:.0f} s", flush=True)

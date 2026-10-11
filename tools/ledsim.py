@@ -52,7 +52,7 @@ def camera_rays(cam, aim):
 class ShapeScene:
     """Deformed head + static mask on the GPU, with smooth head normals."""
 
-    def __init__(self, verts, faces, lipw, mask_tris, base=None):
+    def __init__(self, verts, faces, lipw, mask_tris, base=None, fast_shadows=False):
         c = verts[faces].mean(1)
         keep = np.all((c > BOX[0]) & (c < BOX[1]), axis=1)
         if base is not None:
@@ -77,6 +77,14 @@ class ShapeScene:
         lw = np.concatenate([lipw[f].mean(1), np.zeros(len(mt))]).astype(np.float32)
         self.lipw = cp.asarray(lw)
         self.is_head = cp.asarray(np.r_[np.ones(self.n_head, bool), np.zeros(len(mt), bool)])
+        # shadow rays: by default all triangles; fast_shadows keeps only the front of the face (the
+        # LEDs sit in the beak cavity, so nose / lips / cheeks are the only possible occluders)
+        if fast_shadows:
+            hc = tri[:self.n_head].mean(1)
+            occ = tri[:self.n_head][(hc[:, 2] > lipshapes.SLIT[2] - 35) & (np.abs(hc[:, 0]) < 85)]
+            self.s0 = cp.asarray(occ[:, 0]); self.s1 = cp.asarray(occ[:, 1] - occ[:, 0]); self.s2 = cp.asarray(occ[:, 2] - occ[:, 0])
+        else:
+            self.s0, self.s1, self.s2 = self.v0, self.e1, self.e2
 
     def primary(self, cam, dirs):
         t, i, u, v = rt.cast(self.v0, self.e1, self.e2, cam[None], dirs)
@@ -99,7 +107,7 @@ class ShapeScene:
         l = L / cp.maximum(dist[:, None], 1e-6)
         ndl = cp.clip((g["n"] * l).sum(1), 0, None)
         o = g["p"] + g["n"] * 0.15
-        t, i, _, _ = rt.cast(self.v0, self.e1, self.e2, o, l, tmax=dist - 0.5)
+        t, i, _, _ = rt.cast(self.s0, self.s1, self.s2, o, l, tmax=dist - 0.5)
         lit = (i < 0) & g["hit"] & (ndl > 0)
         ax = led_aim - led; ax = ax / np.linalg.norm(ax)
         beam = cp.clip((-l * cp.asarray(ax, dtype=cp.float32)[None]).sum(1), 0, None) ** BEAM_M
