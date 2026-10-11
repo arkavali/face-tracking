@@ -5,6 +5,8 @@ frame gets a label vector (own channel set, see CHANNELS).
 Keys: Space pause/resume, N skip the current prompt, Q/Esc stop (what is recorded is kept).
 Mistake: Space (pause), Left/Right to pick the prompt to go back to, Space again: that prompt is
 redone from its rest phase and the frames recorded for it and after it get valid=0.
+L cycles the flash LED (off / dim / mid). R starts/stops a plain recording (no labels, also while
+paused) to out/cam/rec_*, same format as mouth_cam.py.
 
 Per prompt: rest (neutral, shows what comes next) -> ramp in -> hold -> ramp out. The label is the
 prompt's target vector times an envelope 0..1 (0 at rest, 1 while holding), so the model also
@@ -111,7 +113,8 @@ def main():
     args = ap.parse_args()
     items = schedule(args.reps, args.seed if args.seed is not None else int(time.time()))
     total = sum(FREE_SECONDS if p[2] is None else sum(s for _, s in PHASES) for p in items)
-    print(f"{len(items)} prompts, ~{total / 60:.1f} min. Space pause, N skip, Q stop.", flush=True)
+    print(f"{len(items)} prompts, ~{total / 60:.1f} min. Keys in the window: Space start/pause, "
+          f"arrows (paused) pick the prompt to redo, N skip, L LED, R plain recording, Q stop.", flush=True)
 
     st = Stream(args.port or find_port())
     time.sleep(0.3)
@@ -124,6 +127,8 @@ def main():
     rows = []   # labels, written at the end: rewinding marks earlier rows invalid
 
     k, t0, paused, pause_t = 0, time.time(), True, time.time()   # start paused: Space to begin
+    led, led_i = [0, 20, 80], 0
+    rec = None   # plain recording
     n = 0
     try:
         for head, data in st.frames():
@@ -168,7 +173,14 @@ def main():
                     env = f"{e:.3f}"
                 rows.append([seq, pid, phase, env, lab, k, True])
                 n += 1
+            if rec:
+                off = rec["mj"].tell()
+                rec["mj"].write(data)
+                rec["csv"].write(f"{seq},{ms},{now:.4f},{off},{ln}\n")
+                rec["n"] += 1
             view = cv2.cvtColor(cv2.resize(img, None, fx=2, fy=2), cv2.COLOR_GRAY2BGR)
+            if rec:
+                cv2.putText(view, f"REC {rec['n']}", (8, 26), 0, 0.8, (0, 0, 255), 2)
             if paused:
                 p = panel(view.shape[1], "ПАУЗА: пробел - продолжить, стрелки - выбрать эмоцию",
                           f"с: {text}   ({k + 1}/{len(items)})   (она и всё после неё перепишутся)",
@@ -185,6 +197,20 @@ def main():
             key = key_ex & 0xFF if key_ex >= 0 else -1
             if key in (ord("q"), 27):
                 break
+            if key == ord("l"):
+                led_i = (led_i + 1) % len(led)
+                st.send(f"led {led[led_i]}")
+            if key == ord("r"):
+                if rec:
+                    rec["mj"].close(); rec["csv"].close()
+                    print("recorded", rec["n"], "frames to", rec["dir"], flush=True)
+                    rec = None
+                else:
+                    rd = OUT.parent / "cam" / time.strftime("rec_%Y%m%d_%H%M%S")
+                    rd.mkdir(parents=True)
+                    rec = {"dir": rd, "n": 0, "mj": open(rd / "frames.mjpeg", "wb"), "csv": open(rd / "frames.csv", "w")}
+                    rec["csv"].write("seq,dev_ms,pc_time,offset,len\n")
+                    print("recording to", rd, flush=True)
             if paused and key_ex in (KEY_LEFT, KEY_RIGHT):
                 k = max(0, k - 1) if key_ex == KEY_LEFT else min(len(items) - 1, k + 1)
             if key == ord(" "):
@@ -208,6 +234,9 @@ def main():
                     break
     finally:
         mj.close(); fcsv.close()
+        if rec:
+            rec["mj"].close(); rec["csv"].close()
+            print("recorded", rec["n"], "frames to", rec["dir"], flush=True)
         with open(d / "labels.csv", "w", encoding="utf-8") as lcsv:
             lcsv.write("seq,prompt,phase,envelope,valid," + ",".join(CHANNELS) + "\n")
             for seq, pid, phase, env, lab, _, ok in rows:
