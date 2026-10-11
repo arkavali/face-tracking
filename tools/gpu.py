@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import site
+import warnings
 from pathlib import Path
 
 cp = None
@@ -18,7 +19,9 @@ for base in site.getsitepackages():
             os.add_dll_directory(str(b))
             os.environ["PATH"] = str(b) + os.pathsep + os.environ.get("PATH", "")
 try:
-    import cupy as cp  # noqa: F811
+    with warnings.catch_warnings():   # "CUDA path could not be detected": expected here
+        warnings.simplefilter("ignore", UserWarning)
+        import cupy as cp  # noqa: F811
     cp.cuda.runtime.getDeviceCount()
 except Exception:  # no GPU, driver or CuPy: callers fall back to numpy
     cp = None
