@@ -9,6 +9,7 @@ Survey, camera choice and placement: [docs/survey.md](docs/survey.md).
 | File | What it does |
 |---|---|
 | `flash_firmware.bat` | Build `firmware/` (JPEG streamer) and flash the AI-Thinker ESP32-CAM |
+| `calib_rec.bat [COMx] [--reps N]` | Prompted calibration recording (~3 min per pass, 30 expressions) to `out/calib/cal_*` with per-frame labels |
 | `mouth_cam.bat [COMx]` | Live view; R records to `out/cam/rec_*` (frames.mjpeg + frames.csv), S snapshot, L flash LED, Q quit |
 
 The brow firmware for the same board: `../brow_tracker/flash_firmware.bat`.
@@ -28,6 +29,8 @@ Streamer only (no tracking yet): hardware JPEG 320x240 over Serial at 921600 bau
 | `preview.py` | IR-like render of the camera view from given placements (`out/preview.png`) |
 | `fusion_mcp.py` | Minimal client for Fusion's local MCP server (read-only scripts, mesh export) |
 | `mouth_cam.py` | Serial live view / recorder for the streamer |
+| `calib_rec.py` | Prompted calibration recorder; own channel set (`CHANNELS`), labels = target x envelope |
+| `teacher.py` | Babble face model (data/babble_face.onnx, non-commercial licence) on recordings -> babble.npz |
 | `gpu.py` | CuPy loader (copy of `../eye_tracker/tools/gpu.py`) |
 
 `data/head.bin`, `data/mask.bin` (not in git): meshes dumped from the open Fusion document with a
