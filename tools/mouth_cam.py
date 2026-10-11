@@ -92,6 +92,8 @@ def main():
     if args.q:
         st.send(f"q {args.q}")
     st.send("stream on")
+    print("Keys work in the picture window (click it first): R record start/stop, S snapshot, "
+          "L flash LED, Q quit. Recordings: out/cam/rec_*", flush=True)
     rec = None
     led = [0, 20, 80]
     led_i = 0
@@ -140,7 +142,7 @@ def main():
         if k == ord("r"):
             if rec:
                 rec["mj"].close(); rec["csv"].close()
-                print("recorded", rec["n"], "frames to", rec["dir"])
+                print("recorded", rec["n"], "frames to", rec["dir"], flush=True)
                 rec = None
             else:
                 d = OUT / time.strftime("rec_%Y%m%d_%H%M%S")
