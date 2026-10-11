@@ -94,3 +94,23 @@ small mask shift loses the chin. Maps: `placement_sweep.png`; views: `placement_
 
 Caveats: generic head mesh, not the wearer's face; the mask's jaw/palate are not modelled yet;
 lens FOV taken as diagonal (equidistant fisheye for 120/160 deg).
+
+## IR LED layout (2026-10-11, `tools/ledsim.py`, `tools/lipshapes.py`, `tools/rt.py`)
+
+Camera at the recommended spot (55 mm in front of the mouth slit, 30 mm above, 120 deg). Mouth
+shapes are smooth deformations of the Fusion head mesh (jaw open 16 deg, smile, pucker, pucker up,
+"o", cheek puff; rough, not anatomy). 137 candidate LED positions in the free space of the beak,
+point LEDs with a cos^2 beam aimed at the mouth, shadows, wet-lip highlights, auto exposure.
+Layout score = how far apart the shapes stay in the 80x60 net input relative to the spread from a
++-5 mm mask shift (mean log ratio over 8 shape pairs). Full table: `led_report.txt`, pictures:
+`led_layouts.png` (rows: LED at the lens, then the best layouts).
+
+- One LED at the lens (flat frontal light) is the worst: score -0.76, 58 % of the mouth region
+  nearly black after exposure; relief (pucker, "o" rim) barely shows.
+- **Best: a symmetric pair at the sides, x = +-45 mm, at mouth height (-10..+10 mm), 45-65 mm in
+  front of the lips, aimed at the mouth**: score -0.43..-0.52, dark 30-37 %. Side light throws
+  shading on the pushed-out lips, which is what separates pucker / "o" / open jaw.
+- Two such pairs (one slightly above, one slightly below the mouth line) add a little (-0.29..-0.38).
+- Hardest pairs in every layout: neutral vs smile and pucker vs pucker-up (small geometric change).
+- Raw speed: the CUDA kernel casts 20k rays against 44k triangles in ~30 ms; the whole sweep
+  (7 shapes x 7 shifts x 137 LEDs, all with shadow rays) takes ~100 s.

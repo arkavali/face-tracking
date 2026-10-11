@@ -25,6 +25,15 @@ def load_mesh(name: str) -> np.ndarray:
     return v[i]
 
 
+def load_indexed(name: str):
+    """Vertices (V, 3) mm and triangle indices (T, 3)."""
+    raw = (DATA / f"{name}.bin").read_bytes()
+    nv, nt = struct.unpack_from("<ii", raw)
+    v = np.frombuffer(raw, "<f8", nv * 3, 8).reshape(-1, 3) * 10.0
+    i = np.frombuffer(raw, "<i4", nt * 3, 8 + nv * 24).reshape(-1, 3)
+    return v.copy(), i.copy()
+
+
 class Scene:
     def __init__(self, names=("head", "mask"), box=None):
         """box = (lo, hi) xyz corners: keep only triangles with the centroid inside."""
@@ -40,7 +49,7 @@ class Scene:
         self.tris = np.concatenate(tris)
         self.obj = np.concatenate(ids)
         t = xp.asarray(self.tris, dtype=xp.float32)
-        self.v0 = t[:, 0]
+        self.v0 = xp.ascontiguousarray(t[:, 0])
         self.e1 = t[:, 1] - t[:, 0]
         self.e2 = t[:, 2] - t[:, 0]
         n = np.cross(self.tris[:, 1] - self.tris[:, 0], self.tris[:, 2] - self.tris[:, 0])
@@ -48,6 +57,10 @@ class Scene:
 
     def cast(self, o, d, budget=4e6):
         """Nearest hit per ray (Moller-Trumbore). Returns t (inf = miss), triangle index."""
+        if cp is not None:      # CUDA kernel (rt.py)
+            import rt
+            t, i, _, _ = rt.cast(self.v0, self.e1, self.e2, o, d)
+            return t, i
         o = xp.asarray(o, dtype=xp.float32).reshape(-1, 3)
         d = xp.asarray(d, dtype=xp.float32).reshape(-1, 3)
         if o.shape[0] == 1:
