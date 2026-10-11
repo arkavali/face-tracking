@@ -91,12 +91,15 @@ def panel(width, text, sub, progress, colour):
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
 
-def schedule(reps, seed):
+def schedule(reps, seed, shuffle=False):
+    """Prompts in PROMPTS order (grouped by type: jaw, smiles, frown, lips, cheeks, jaw sideways,
+    tongue); --shuffle randomises the order between the neutral start and the free end."""
     rng = random.Random(seed)
     items = []
     for _ in range(reps):
         body = PROMPTS[1:-1][:]
-        rng.shuffle(body)
+        if shuffle:
+            rng.shuffle(body)
         items += [PROMPTS[0]] + body + [PROMPTS[-1]]
     return items
 
@@ -110,8 +113,9 @@ def main():
     ap.add_argument("port", nargs="?")
     ap.add_argument("--reps", type=int, default=1)
     ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--shuffle", action="store_true", help="random prompt order")
     args = ap.parse_args()
-    items = schedule(args.reps, args.seed if args.seed is not None else int(time.time()))
+    items = schedule(args.reps, args.seed if args.seed is not None else int(time.time()), args.shuffle)
     total = sum(FREE_SECONDS if p[2] is None else sum(s for _, s in PHASES) for p in items)
     print(f"{len(items)} prompts, ~{total / 60:.1f} min. Keys in the window: Space start/pause, "
           f"arrows (paused) pick the prompt to redo, N skip, L LED, R plain recording, Q stop.", flush=True)
