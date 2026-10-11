@@ -69,7 +69,10 @@ mirror (noisy frames), 8 px from below.
 
 Placement comparison: [docs/placement.md](docs/placement.md).
 
-Setup: uses `../brow_tracker/.venv` (Python 3.9, numpy, opencv-python, matplotlib).
+Setup: uses `../brow_tracker/.venv` (Python 3.9, numpy, opencv-python, matplotlib). GPU,
+ready but not used by the renderer yet: `cupy-cuda12x` + `nvidia-cuda-runtime-cu12`,
+`nvidia-curand-cu12`, `nvidia-cuda-nvrtc-cu12`, `nvidia-cublas-cu12` in the same venv;
+`from gpu import cp` (tools/gpu.py) loads CuPy on the RTX 5070 (None without a GPU).
 
 ```
 PY=../brow_tracker/.venv/Scripts/python
