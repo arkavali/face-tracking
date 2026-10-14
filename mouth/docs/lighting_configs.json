@@ -1,0 +1,1773 @@
+{
+ "frame": "x = wearer's left (+), y = up, z = forward (out of the face), mm. rel_slit = from the mouth slit (x, mm above, mm in front); rel_cam = from the camera lens",
+ "camera": {
+  "rel_slit": [
+   0.0,
+   30.0,
+   55.0
+  ],
+  "aim_rel_slit": [
+   0.0,
+   -14.0,
+   -10.0
+  ],
+  "lens": "OV2640 120 deg"
+ },
+ "metric": "val MAE of the mouth CNN on 1200 held-out synthetic frames, lower is better",
+ "sets": {
+  "main": {
+   "data": "out/synth/data.npz",
+   "render": "python synth.py render --n 6000 --set main",
+   "train": "python synth.py train --set main --epochs 60 --seeds 0,1,2",
+   "leds": {
+    "lens": {
+     "rel_slit": [
+      0.0,
+      24.0,
+      55.0
+     ],
+     "rel_cam": [
+      0.0,
+      -6.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "sideL_far": {
+     "rel_slit": [
+      45.0,
+      11.0,
+      64.0
+     ],
+     "rel_cam": [
+      45.0,
+      -19.0,
+      9.0
+     ],
+     "in_camera_view": false
+    },
+    "sideR_far": {
+     "rel_slit": [
+      -45.0,
+      11.0,
+      64.0
+     ],
+     "rel_cam": [
+      -45.0,
+      -19.0,
+      9.0
+     ],
+     "in_camera_view": false
+    },
+    "sideL_near": {
+     "rel_slit": [
+      20.0,
+      21.0,
+      54.0
+     ],
+     "rel_cam": [
+      20.0,
+      -9.0,
+      -1.0
+     ],
+     "in_camera_view": false
+    },
+    "sideR_near": {
+     "rel_slit": [
+      -20.0,
+      21.0,
+      54.0
+     ],
+     "rel_cam": [
+      -20.0,
+      -9.0,
+      -1.0
+     ],
+     "in_camera_view": false
+    },
+    "up_cam": {
+     "rel_slit": [
+      0.0,
+      45.0,
+      55.0
+     ],
+     "rel_cam": [
+      0.0,
+      15.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "down_lip": {
+     "rel_slit": [
+      0.0,
+      -25.0,
+      50.0
+     ],
+     "rel_cam": [
+      0.0,
+      -55.0,
+      -5.0
+     ],
+     "in_camera_view": false
+    },
+    "nose_gap": {
+     "rel_slit": [
+      0.0,
+      35.0,
+      38.0
+     ],
+     "rel_cam": [
+      0.0,
+      5.0,
+      -17.0
+     ],
+     "in_camera_view": false
+    },
+    "down_cam": {
+     "rel_slit": [
+      0.0,
+      15.0,
+      55.0
+     ],
+     "rel_cam": [
+      0.0,
+      -15.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "sideL_mid": {
+     "rel_slit": [
+      30.0,
+      5.0,
+      55.0
+     ],
+     "rel_cam": [
+      30.0,
+      -25.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "sideR_mid": {
+     "rel_slit": [
+      -30.0,
+      5.0,
+      55.0
+     ],
+     "rel_cam": [
+      -30.0,
+      -25.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "sideL_low": {
+     "rel_slit": [
+      45.0,
+      -9.0,
+      64.0
+     ],
+     "rel_cam": [
+      45.0,
+      -39.0,
+      9.0
+     ],
+     "in_camera_view": false
+    },
+    "sideR_low": {
+     "rel_slit": [
+      -45.0,
+      -9.0,
+      64.0
+     ],
+     "rel_cam": [
+      -45.0,
+      -39.0,
+      9.0
+     ],
+     "in_camera_view": false
+    },
+    "v_front": {
+     "rel_slit": [
+      0.0,
+      0.0,
+      69.0
+     ],
+     "rel_cam": [
+      0.0,
+      -30.0,
+      14.0
+     ],
+     "in_camera_view": false
+    },
+    "v_above_nose": {
+     "rel_slit": [
+      0.0,
+      60.0,
+      29.0
+     ],
+     "rel_cam": [
+      0.0,
+      30.0,
+      -26.0
+     ],
+     "in_camera_view": false
+    }
+   },
+   "variants": {
+    "lens": {
+     "channels": [
+      [
+       "lens"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.033,
+      "smileR": 0.037,
+      "pucker": 0.033,
+      "funnel": 0.032,
+      "lipsUp": 0.034,
+      "cheekL": 0.038,
+      "cheekR": 0.036,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "side far": {
+     "channels": [
+      [
+       "sideL_far",
+       "sideR_far"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.032,
+      "+-": 0.001,
+      "jawOpen": 0.021,
+      "smileL": 0.037,
+      "smileR": 0.038,
+      "pucker": 0.03,
+      "funnel": 0.032,
+      "lipsUp": 0.031,
+      "cheekL": 0.033,
+      "cheekR": 0.032,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "side near": {
+     "channels": [
+      [
+       "sideL_near",
+       "sideR_near"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "jawOpen": 0.025,
+      "smileL": 0.035,
+      "smileR": 0.038,
+      "pucker": 0.034,
+      "funnel": 0.036,
+      "lipsUp": 0.03,
+      "cheekL": 0.037,
+      "cheekR": 0.033,
+      "report": "synth_report_1seed.txt",
+      "seeds": 1
+     }
+    },
+    "vertical": {
+     "channels": [
+      [
+       "up_cam",
+       "down_lip"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.035,
+      "smileR": 0.037,
+      "pucker": 0.033,
+      "funnel": 0.032,
+      "lipsUp": 0.033,
+      "cheekL": 0.034,
+      "cheekR": 0.035,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "cross": {
+     "channels": [
+      [
+       "sideL_near",
+       "sideR_near",
+       "up_cam",
+       "down_lip"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "+-": 0.001,
+      "jawOpen": 0.022,
+      "smileL": 0.034,
+      "smileR": 0.036,
+      "pucker": 0.032,
+      "funnel": 0.035,
+      "lipsUp": 0.032,
+      "cheekL": 0.035,
+      "cheekR": 0.034,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "blink side far": {
+     "channels": [
+      [
+       "sideL_far"
+      ],
+      [
+       "sideR_far"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.03,
+      "+-": 0.001,
+      "jawOpen": 0.022,
+      "smileL": 0.032,
+      "smileR": 0.035,
+      "pucker": 0.027,
+      "funnel": 0.033,
+      "lipsUp": 0.031,
+      "cheekL": 0.03,
+      "cheekR": 0.03,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "blink side near": {
+     "channels": [
+      [
+       "sideL_near"
+      ],
+      [
+       "sideR_near"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.032,
+      "jawOpen": 0.023,
+      "smileL": 0.034,
+      "smileR": 0.035,
+      "pucker": 0.027,
+      "funnel": 0.038,
+      "lipsUp": 0.032,
+      "cheekL": 0.034,
+      "cheekR": 0.033,
+      "report": "synth_report_1seed.txt",
+      "seeds": 1
+     }
+    },
+    "blink vertical": {
+     "channels": [
+      [
+       "up_cam"
+      ],
+      [
+       "down_lip"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.025,
+      "+-": 0.0,
+      "jawOpen": 0.019,
+      "smileL": 0.028,
+      "smileR": 0.029,
+      "pucker": 0.021,
+      "funnel": 0.023,
+      "lipsUp": 0.024,
+      "cheekL": 0.03,
+      "cheekR": 0.029,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "side mid": {
+     "channels": [
+      [
+       "sideL_mid",
+       "sideR_mid"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "jawOpen": 0.022,
+      "smileL": 0.038,
+      "smileR": 0.037,
+      "pucker": 0.031,
+      "funnel": 0.032,
+      "lipsUp": 0.032,
+      "cheekL": 0.034,
+      "cheekR": 0.039,
+      "report": "synth_report_1seed.txt",
+      "seeds": 1
+     }
+    },
+    "side low": {
+     "channels": [
+      [
+       "sideL_low",
+       "sideR_low"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.031,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.037,
+      "smileR": 0.038,
+      "pucker": 0.026,
+      "funnel": 0.033,
+      "lipsUp": 0.03,
+      "cheekL": 0.033,
+      "cheekR": 0.032,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "cam vertical": {
+     "channels": [
+      [
+       "up_cam",
+       "down_cam"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.032,
+      "+-": 0.001,
+      "jawOpen": 0.022,
+      "smileL": 0.033,
+      "smileR": 0.034,
+      "pucker": 0.031,
+      "funnel": 0.03,
+      "lipsUp": 0.032,
+      "cheekL": 0.037,
+      "cheekR": 0.034,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "triple cam+nose": {
+     "channels": [
+      [
+       "up_cam",
+       "down_cam",
+       "nose_gap"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.032,
+      "jawOpen": 0.024,
+      "smileL": 0.031,
+      "smileR": 0.031,
+      "pucker": 0.03,
+      "funnel": 0.032,
+      "lipsUp": 0.034,
+      "cheekL": 0.04,
+      "cheekR": 0.035,
+      "report": "synth_report_1seed.txt",
+      "seeds": 1
+     }
+    },
+    "blink side mid": {
+     "channels": [
+      [
+       "sideL_mid"
+      ],
+      [
+       "sideR_mid"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.03,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.031,
+      "smileR": 0.034,
+      "pucker": 0.026,
+      "funnel": 0.033,
+      "lipsUp": 0.03,
+      "cheekL": 0.031,
+      "cheekR": 0.031,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "blink cam vertical": {
+     "channels": [
+      [
+       "up_cam"
+      ],
+      [
+       "down_cam"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.029,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.03,
+      "smileR": 0.032,
+      "pucker": 0.026,
+      "funnel": 0.027,
+      "lipsUp": 0.028,
+      "cheekL": 0.034,
+      "cheekR": 0.031,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "blink side 4ch": {
+     "channels": [
+      [
+       "sideL_near"
+      ],
+      [
+       "sideR_near"
+      ],
+      [
+       "sideL_far"
+      ],
+      [
+       "sideR_far"
+      ]
+     ],
+     "phases": 4,
+     "result": {
+      "all": 0.029,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.03,
+      "smileR": 0.033,
+      "pucker": 0.024,
+      "funnel": 0.029,
+      "lipsUp": 0.032,
+      "cheekL": 0.031,
+      "cheekR": 0.029,
+      "report": "synth_report_seeds.txt",
+      "seeds": 5
+     }
+    },
+    "v-pair (sweep best)": {
+     "channels": [
+      [
+       "v_front",
+       "v_above_nose"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.034,
+      "jawOpen": 0.02,
+      "smileL": 0.041,
+      "smileR": 0.038,
+      "pucker": 0.032,
+      "funnel": 0.037,
+      "lipsUp": 0.031,
+      "cheekL": 0.038,
+      "cheekR": 0.036,
+      "report": "synth_report_1seed.txt",
+      "seeds": 1
+     }
+    },
+    "cross (sweep best)": {
+     "channels": [
+      [
+       "v_front",
+       "v_above_nose",
+       "sideL_far",
+       "sideR_far"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "jawOpen": 0.021,
+      "smileL": 0.037,
+      "smileR": 0.039,
+      "pucker": 0.03,
+      "funnel": 0.034,
+      "lipsUp": 0.029,
+      "cheekL": 0.034,
+      "cheekR": 0.038,
+      "report": "synth_report_1seed.txt",
+      "seeds": 1
+     }
+    },
+    "blink v-pair": {
+     "channels": [
+      [
+       "v_front"
+      ],
+      [
+       "v_above_nose"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.033,
+      "jawOpen": 0.022,
+      "smileL": 0.041,
+      "smileR": 0.038,
+      "pucker": 0.031,
+      "funnel": 0.036,
+      "lipsUp": 0.032,
+      "cheekL": 0.032,
+      "cheekR": 0.034,
+      "report": "synth_report_1seed.txt",
+      "seeds": 1
+     }
+    },
+    "blink triple cam+nose": {
+     "channels": [
+      [
+       "up_cam"
+      ],
+      [
+       "down_cam"
+      ],
+      [
+       "nose_gap"
+      ]
+     ],
+     "phases": 3,
+     "result": null
+    }
+   }
+  },
+  "vertical": {
+   "data": "out/synth/data_vertical.npz",
+   "render": "python synth.py render --n 6000 --set vertical",
+   "train": "python synth.py train --set vertical --epochs 60 --seeds 0,1,2",
+   "leds": {
+    "U1": {
+     "rel_slit": [
+      0.0,
+      45.0,
+      55.0
+     ],
+     "rel_cam": [
+      0.0,
+      15.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "U2": {
+     "rel_slit": [
+      0.0,
+      40.0,
+      70.0
+     ],
+     "rel_cam": [
+      0.0,
+      10.0,
+      15.0
+     ],
+     "in_camera_view": false
+    },
+    "U3": {
+     "rel_slit": [
+      0.0,
+      38.0,
+      40.0
+     ],
+     "rel_cam": [
+      0.0,
+      8.0,
+      -15.0
+     ],
+     "in_camera_view": false
+    },
+    "U4": {
+     "rel_slit": [
+      0.0,
+      55.0,
+      60.0
+     ],
+     "rel_cam": [
+      0.0,
+      25.0,
+      5.0
+     ],
+     "in_camera_view": false
+    },
+    "D1": {
+     "rel_slit": [
+      0.0,
+      -25.0,
+      50.0
+     ],
+     "rel_cam": [
+      0.0,
+      -55.0,
+      -5.0
+     ],
+     "in_camera_view": false
+    },
+    "D2": {
+     "rel_slit": [
+      0.0,
+      -35.0,
+      65.0
+     ],
+     "rel_cam": [
+      0.0,
+      -65.0,
+      10.0
+     ],
+     "in_camera_view": false
+    },
+    "D3": {
+     "rel_slit": [
+      0.0,
+      -10.0,
+      45.0
+     ],
+     "rel_cam": [
+      0.0,
+      -40.0,
+      -10.0
+     ],
+     "in_camera_view": false
+    },
+    "D4": {
+     "rel_slit": [
+      0.0,
+      -20.0,
+      75.0
+     ],
+     "rel_cam": [
+      0.0,
+      -50.0,
+      20.0
+     ],
+     "in_camera_view": false
+    },
+    "L": {
+     "rel_slit": [
+      45.0,
+      10.0,
+      60.0
+     ],
+     "rel_cam": [
+      45.0,
+      -20.0,
+      5.0
+     ],
+     "in_camera_view": false
+    },
+    "R": {
+     "rel_slit": [
+      -45.0,
+      10.0,
+      60.0
+     ],
+     "rel_cam": [
+      -45.0,
+      -20.0,
+      5.0
+     ],
+     "in_camera_view": false
+    }
+   },
+   "variants": {
+    "blink U1/D1": {
+     "channels": [
+      [
+       "U1"
+      ],
+      [
+       "D1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.026,
+      "+-": 0.0,
+      "jawOpen": 0.018,
+      "smileL": 0.031,
+      "smileR": 0.027,
+      "pucker": 0.02,
+      "funnel": 0.025,
+      "lipsUp": 0.026,
+      "cheekL": 0.032,
+      "cheekR": 0.031,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U1/D2": {
+     "channels": [
+      [
+       "U1"
+      ],
+      [
+       "D2"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.026,
+      "+-": 0.001,
+      "jawOpen": 0.018,
+      "smileL": 0.031,
+      "smileR": 0.026,
+      "pucker": 0.019,
+      "funnel": 0.024,
+      "lipsUp": 0.026,
+      "cheekL": 0.032,
+      "cheekR": 0.032,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U1/D3": {
+     "channels": [
+      [
+       "U1"
+      ],
+      [
+       "D3"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.0,
+      "jawOpen": 0.021,
+      "smileL": 0.033,
+      "smileR": 0.027,
+      "pucker": 0.021,
+      "funnel": 0.026,
+      "lipsUp": 0.025,
+      "cheekL": 0.035,
+      "cheekR": 0.032,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U1/D4": {
+     "channels": [
+      [
+       "U1"
+      ],
+      [
+       "D4"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.026,
+      "+-": 0.001,
+      "jawOpen": 0.019,
+      "smileL": 0.031,
+      "smileR": 0.026,
+      "pucker": 0.021,
+      "funnel": 0.025,
+      "lipsUp": 0.024,
+      "cheekL": 0.032,
+      "cheekR": 0.031,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U2/D1": {
+     "channels": [
+      [
+       "U2"
+      ],
+      [
+       "D1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.028,
+      "+-": 0.001,
+      "jawOpen": 0.018,
+      "smileL": 0.035,
+      "smileR": 0.029,
+      "pucker": 0.021,
+      "funnel": 0.027,
+      "lipsUp": 0.027,
+      "cheekL": 0.032,
+      "cheekR": 0.032,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U2/D2": {
+     "channels": [
+      [
+       "U2"
+      ],
+      [
+       "D2"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.001,
+      "jawOpen": 0.018,
+      "smileL": 0.033,
+      "smileR": 0.028,
+      "pucker": 0.02,
+      "funnel": 0.027,
+      "lipsUp": 0.026,
+      "cheekL": 0.031,
+      "cheekR": 0.03,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U2/D3": {
+     "channels": [
+      [
+       "U2"
+      ],
+      [
+       "D3"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.029,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.036,
+      "smileR": 0.031,
+      "pucker": 0.022,
+      "funnel": 0.029,
+      "lipsUp": 0.028,
+      "cheekL": 0.035,
+      "cheekR": 0.034,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U2/D4": {
+     "channels": [
+      [
+       "U2"
+      ],
+      [
+       "D4"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.001,
+      "jawOpen": 0.019,
+      "smileL": 0.034,
+      "smileR": 0.029,
+      "pucker": 0.021,
+      "funnel": 0.027,
+      "lipsUp": 0.026,
+      "cheekL": 0.032,
+      "cheekR": 0.031,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U3/D1": {
+     "channels": [
+      [
+       "U3"
+      ],
+      [
+       "D1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.0,
+      "jawOpen": 0.019,
+      "smileL": 0.031,
+      "smileR": 0.026,
+      "pucker": 0.021,
+      "funnel": 0.025,
+      "lipsUp": 0.027,
+      "cheekL": 0.034,
+      "cheekR": 0.033,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U3/D2": {
+     "channels": [
+      [
+       "U3"
+      ],
+      [
+       "D2"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.031,
+      "smileR": 0.026,
+      "pucker": 0.022,
+      "funnel": 0.025,
+      "lipsUp": 0.027,
+      "cheekL": 0.035,
+      "cheekR": 0.032,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U3/D3": {
+     "channels": [
+      [
+       "U3"
+      ],
+      [
+       "D3"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.028,
+      "+-": 0.0,
+      "jawOpen": 0.021,
+      "smileL": 0.034,
+      "smileR": 0.028,
+      "pucker": 0.02,
+      "funnel": 0.025,
+      "lipsUp": 0.026,
+      "cheekL": 0.036,
+      "cheekR": 0.036,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U3/D4": {
+     "channels": [
+      [
+       "U3"
+      ],
+      [
+       "D4"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.0,
+      "jawOpen": 0.019,
+      "smileL": 0.031,
+      "smileR": 0.027,
+      "pucker": 0.021,
+      "funnel": 0.024,
+      "lipsUp": 0.026,
+      "cheekL": 0.034,
+      "cheekR": 0.033,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U4/D1": {
+     "channels": [
+      [
+       "U4"
+      ],
+      [
+       "D1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.026,
+      "+-": 0.001,
+      "jawOpen": 0.018,
+      "smileL": 0.031,
+      "smileR": 0.026,
+      "pucker": 0.02,
+      "funnel": 0.025,
+      "lipsUp": 0.026,
+      "cheekL": 0.031,
+      "cheekR": 0.03,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U4/D2": {
+     "channels": [
+      [
+       "U4"
+      ],
+      [
+       "D2"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.025,
+      "+-": 0.0,
+      "jawOpen": 0.019,
+      "smileL": 0.031,
+      "smileR": 0.026,
+      "pucker": 0.02,
+      "funnel": 0.024,
+      "lipsUp": 0.025,
+      "cheekL": 0.03,
+      "cheekR": 0.03,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U4/D3": {
+     "channels": [
+      [
+       "U4"
+      ],
+      [
+       "D3"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.032,
+      "smileR": 0.027,
+      "pucker": 0.021,
+      "funnel": 0.026,
+      "lipsUp": 0.025,
+      "cheekL": 0.035,
+      "cheekR": 0.031,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink U4/D4": {
+     "channels": [
+      [
+       "U4"
+      ],
+      [
+       "D4"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.026,
+      "+-": 0.0,
+      "jawOpen": 0.018,
+      "smileL": 0.031,
+      "smileR": 0.027,
+      "pucker": 0.02,
+      "funnel": 0.024,
+      "lipsUp": 0.024,
+      "cheekL": 0.03,
+      "cheekR": 0.031,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "both U1+D1": {
+     "channels": [
+      [
+       "U1",
+       "D1"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.04,
+      "smileR": 0.033,
+      "pucker": 0.029,
+      "funnel": 0.033,
+      "lipsUp": 0.035,
+      "cheekL": 0.035,
+      "cheekR": 0.034,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "control: U1+D1 twice": {
+     "channels": [
+      [
+       "U1",
+       "D1"
+      ],
+      [
+       "U1",
+       "D1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.033,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.041,
+      "smileR": 0.035,
+      "pucker": 0.031,
+      "funnel": 0.033,
+      "lipsUp": 0.036,
+      "cheekL": 0.036,
+      "cheekR": 0.034,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink 3ch U1/D1/sides": {
+     "channels": [
+      [
+       "U1"
+      ],
+      [
+       "D1"
+      ],
+      [
+       "L",
+       "R"
+      ]
+     ],
+     "phases": 3,
+     "result": {
+      "all": 0.027,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.033,
+      "smileR": 0.028,
+      "pucker": 0.02,
+      "funnel": 0.026,
+      "lipsUp": 0.025,
+      "cheekL": 0.03,
+      "cheekR": 0.03,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    },
+    "blink 4ch U1/D1/L/R": {
+     "channels": [
+      [
+       "U1"
+      ],
+      [
+       "D1"
+      ],
+      [
+       "L"
+      ],
+      [
+       "R"
+      ]
+     ],
+     "phases": 4,
+     "result": {
+      "all": 0.026,
+      "+-": 0.001,
+      "jawOpen": 0.019,
+      "smileL": 0.032,
+      "smileR": 0.027,
+      "pucker": 0.02,
+      "funnel": 0.026,
+      "lipsUp": 0.027,
+      "cheekL": 0.03,
+      "cheekR": 0.03,
+      "report": "synth_report_vertical.txt",
+      "seeds": 3
+     }
+    }
+   }
+  },
+  "triangle": {
+   "data": "out/synth/data_triangle.npz",
+   "render": "python synth.py render --n 6000 --set triangle",
+   "train": "python synth.py train --set triangle --epochs 60 --seeds 0,1,2",
+   "leds": {
+    "T1": {
+     "rel_slit": [
+      0.0,
+      38.0,
+      40.0
+     ],
+     "rel_cam": [
+      0.0,
+      8.0,
+      -15.0
+     ],
+     "in_camera_view": false
+    },
+    "T2": {
+     "rel_slit": [
+      0.0,
+      22.0,
+      55.0
+     ],
+     "rel_cam": [
+      0.0,
+      -8.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "BL1": {
+     "rel_slit": [
+      45.0,
+      -25.0,
+      60.0
+     ],
+     "rel_cam": [
+      45.0,
+      -55.0,
+      5.0
+     ],
+     "in_camera_view": false
+    },
+    "BR1": {
+     "rel_slit": [
+      -45.0,
+      -25.0,
+      60.0
+     ],
+     "rel_cam": [
+      -45.0,
+      -55.0,
+      5.0
+     ],
+     "in_camera_view": false
+    },
+    "BL2": {
+     "rel_slit": [
+      55.0,
+      -12.0,
+      55.0
+     ],
+     "rel_cam": [
+      55.0,
+      -42.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "BR2": {
+     "rel_slit": [
+      -55.0,
+      -12.0,
+      55.0
+     ],
+     "rel_cam": [
+      -55.0,
+      -42.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "BL3": {
+     "rel_slit": [
+      35.0,
+      -35.0,
+      65.0
+     ],
+     "rel_cam": [
+      35.0,
+      -65.0,
+      10.0
+     ],
+     "in_camera_view": false
+    },
+    "BR3": {
+     "rel_slit": [
+      -35.0,
+      -35.0,
+      65.0
+     ],
+     "rel_cam": [
+      -35.0,
+      -65.0,
+      10.0
+     ],
+     "in_camera_view": false
+    },
+    "U1": {
+     "rel_slit": [
+      0.0,
+      45.0,
+      55.0
+     ],
+     "rel_cam": [
+      0.0,
+      15.0,
+      0.0
+     ],
+     "in_camera_view": false
+    },
+    "D1": {
+     "rel_slit": [
+      0.0,
+      -25.0,
+      50.0
+     ],
+     "rel_cam": [
+      0.0,
+      -55.0,
+      -5.0
+     ],
+     "in_camera_view": false
+    }
+   },
+   "variants": {
+    "tri blink T1/BL1/BR1": {
+     "channels": [
+      [
+       "T1"
+      ],
+      [
+       "BL1"
+      ],
+      [
+       "BR1"
+      ]
+     ],
+     "phases": 3,
+     "result": {
+      "all": 0.027,
+      "+-": 0.0,
+      "jawOpen": 0.02,
+      "smileL": 0.03,
+      "smileR": 0.027,
+      "pucker": 0.021,
+      "funnel": 0.025,
+      "lipsUp": 0.027,
+      "cheekL": 0.032,
+      "cheekR": 0.031,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri blink T1/BL2/BR2": {
+     "channels": [
+      [
+       "T1"
+      ],
+      [
+       "BL2"
+      ],
+      [
+       "BR2"
+      ]
+     ],
+     "phases": 3,
+     "result": {
+      "all": 0.027,
+      "+-": 0.0,
+      "jawOpen": 0.02,
+      "smileL": 0.032,
+      "smileR": 0.028,
+      "pucker": 0.022,
+      "funnel": 0.025,
+      "lipsUp": 0.028,
+      "cheekL": 0.033,
+      "cheekR": 0.031,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri blink T1/BL3/BR3": {
+     "channels": [
+      [
+       "T1"
+      ],
+      [
+       "BL3"
+      ],
+      [
+       "BR3"
+      ]
+     ],
+     "phases": 3,
+     "result": {
+      "all": 0.027,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.031,
+      "smileR": 0.027,
+      "pucker": 0.023,
+      "funnel": 0.025,
+      "lipsUp": 0.026,
+      "cheekL": 0.033,
+      "cheekR": 0.031,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri 2ch T1/(BL1+BR1)": {
+     "channels": [
+      [
+       "T1"
+      ],
+      [
+       "BL1",
+       "BR1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.027,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.031,
+      "smileR": 0.027,
+      "pucker": 0.021,
+      "funnel": 0.024,
+      "lipsUp": 0.026,
+      "cheekL": 0.032,
+      "cheekR": 0.031,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri both T1+BL1+BR1": {
+     "channels": [
+      [
+       "T1",
+       "BL1",
+       "BR1"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.034,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.042,
+      "smileR": 0.036,
+      "pucker": 0.032,
+      "funnel": 0.03,
+      "lipsUp": 0.036,
+      "cheekL": 0.038,
+      "cheekR": 0.036,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri blink T2/BL1/BR1": {
+     "channels": [
+      [
+       "T2"
+      ],
+      [
+       "BL1"
+      ],
+      [
+       "BR1"
+      ]
+     ],
+     "phases": 3,
+     "result": {
+      "all": 0.028,
+      "+-": 0.0,
+      "jawOpen": 0.02,
+      "smileL": 0.034,
+      "smileR": 0.03,
+      "pucker": 0.022,
+      "funnel": 0.026,
+      "lipsUp": 0.028,
+      "cheekL": 0.032,
+      "cheekR": 0.031,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri blink T2/BL2/BR2": {
+     "channels": [
+      [
+       "T2"
+      ],
+      [
+       "BL2"
+      ],
+      [
+       "BR2"
+      ]
+     ],
+     "phases": 3,
+     "result": {
+      "all": 0.029,
+      "+-": 0.0,
+      "jawOpen": 0.021,
+      "smileL": 0.035,
+      "smileR": 0.031,
+      "pucker": 0.023,
+      "funnel": 0.028,
+      "lipsUp": 0.03,
+      "cheekL": 0.03,
+      "cheekR": 0.031,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri blink T2/BL3/BR3": {
+     "channels": [
+      [
+       "T2"
+      ],
+      [
+       "BL3"
+      ],
+      [
+       "BR3"
+      ]
+     ],
+     "phases": 3,
+     "result": {
+      "all": 0.028,
+      "+-": 0.0,
+      "jawOpen": 0.019,
+      "smileL": 0.034,
+      "smileR": 0.029,
+      "pucker": 0.023,
+      "funnel": 0.027,
+      "lipsUp": 0.029,
+      "cheekL": 0.032,
+      "cheekR": 0.031,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri 2ch T2/(BL1+BR1)": {
+     "channels": [
+      [
+       "T2"
+      ],
+      [
+       "BL1",
+       "BR1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.028,
+      "+-": 0.001,
+      "jawOpen": 0.02,
+      "smileL": 0.035,
+      "smileR": 0.03,
+      "pucker": 0.021,
+      "funnel": 0.028,
+      "lipsUp": 0.027,
+      "cheekL": 0.034,
+      "cheekR": 0.033,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "tri both T2+BL1+BR1": {
+     "channels": [
+      [
+       "T2",
+       "BL1",
+       "BR1"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.034,
+      "+-": 0.0,
+      "jawOpen": 0.022,
+      "smileL": 0.041,
+      "smileR": 0.035,
+      "pucker": 0.03,
+      "funnel": 0.032,
+      "lipsUp": 0.035,
+      "cheekL": 0.037,
+      "cheekR": 0.037,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "ref blink U1/D1": {
+     "channels": [
+      [
+       "U1"
+      ],
+      [
+       "D1"
+      ]
+     ],
+     "phases": 2,
+     "result": {
+      "all": 0.026,
+      "+-": 0.001,
+      "jawOpen": 0.019,
+      "smileL": 0.031,
+      "smileR": 0.026,
+      "pucker": 0.021,
+      "funnel": 0.025,
+      "lipsUp": 0.026,
+      "cheekL": 0.032,
+      "cheekR": 0.032,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    },
+    "ref both U1+D1": {
+     "channels": [
+      [
+       "U1",
+       "D1"
+      ]
+     ],
+     "phases": 1,
+     "result": {
+      "all": 0.033,
+      "+-": 0.001,
+      "jawOpen": 0.021,
+      "smileL": 0.04,
+      "smileR": 0.033,
+      "pucker": 0.029,
+      "funnel": 0.033,
+      "lipsUp": 0.035,
+      "cheekL": 0.035,
+      "cheekR": 0.036,
+      "report": "synth_report_triangle.txt",
+      "seeds": 3
+     }
+    }
+   }
+  }
+ }
+}

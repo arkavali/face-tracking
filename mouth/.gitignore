@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+# Generated output and meshes exported from the private head model
+out/
+data/
+firmware/.pio/
+firmware/.vscode/

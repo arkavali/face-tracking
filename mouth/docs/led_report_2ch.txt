@@ -1,0 +1,36 @@
+== plain skin
+variant          sep mean   sep min   acc all   acc lips   per pair: neutral/pucker, pucker/funnel, jaw/pucker, jaw/funnel, neutral/smile, neutral/cheeks, pucker/pucker_up, smile/pucker
+lens               -0.88     -3.48      0.50       0.80    -0.7   0.7   1.3  -0.4  -3.5  -2.3  -1.3  -0.8
+both mid           -0.63     -2.79      0.60       0.79    -0.7   0.5   1.5   0.1  -2.8  -1.0  -1.9  -0.7
+alt mid            -0.75     -2.82      0.55       0.75    -0.6   0.2   1.2   0.0  -2.8  -1.3  -2.2  -0.6
+alt-n mid          -0.81     -2.94      0.56       0.75    -0.8   0.3   1.2   0.0  -2.9  -1.2  -2.2  -0.7
+ratio mid          -1.09     -3.33      0.46       0.64    -1.3   0.1   1.1  -0.1  -3.3  -1.5  -2.5  -1.2
+both low           -0.53     -2.65      0.59       0.81     0.0   0.0   1.4   0.3  -2.6  -1.4  -1.9  -0.0
+alt low            -0.65     -2.72      0.58       0.80    -0.0  -0.1   1.2   0.2  -2.7  -1.5  -2.2  -0.0
+alt-n low          -0.68     -2.78      0.57       0.80    -0.1  -0.1   1.2   0.2  -2.8  -1.5  -2.1  -0.1
+ratio low          -0.90     -3.14      0.50       0.77    -0.5  -0.2   1.1   0.1  -3.1  -1.6  -2.3  -0.5
+both near          -0.52     -2.31      0.65       0.79    -0.6   0.5   1.5   0.2  -2.3  -0.9  -1.9  -0.6
+alt near           -0.73     -2.60      0.58       0.75    -0.6   0.2   1.2   0.0  -2.6  -1.2  -2.2  -0.6
+alt-n near         -0.78     -2.75      0.58       0.75    -0.8   0.2   1.2   0.0  -2.7  -1.2  -2.2  -0.7
+ratio near         -1.02     -3.14      0.50       0.69    -1.1   0.0   1.0  -0.0  -3.1  -1.5  -2.4  -1.1
+
+== albedo pattern + LED gain noise
+variant          sep mean   sep min   acc all   acc lips   per pair: neutral/pucker, pucker/funnel, jaw/pucker, jaw/funnel, neutral/smile, neutral/cheeks, pucker/pucker_up, smile/pucker
+lens               -0.89     -2.62      0.52       0.72    -1.1   0.5   0.8  -0.6  -2.6  -1.6  -1.4  -1.1
+both mid           -0.75     -2.09      0.64       0.73    -1.1   0.1   0.9  -0.2  -2.1  -0.9  -1.8  -0.9
+alt mid            -0.86     -2.15      0.63       0.71    -0.9  -0.1   0.7  -0.4  -2.1  -1.1  -2.0  -0.9
+alt-n mid          -0.88     -2.44      0.58       0.71    -1.0  -0.0   0.7  -0.3  -2.4  -1.1  -2.0  -0.9
+ratio mid          -1.05     -2.45      0.52       0.61    -1.4  -0.2   0.7  -0.3  -2.4  -1.2  -2.2  -1.3
+both low           -0.64     -2.20      0.65       0.81    -0.3  -0.3   0.9   0.0  -2.2  -1.2  -1.8  -0.3
+alt low            -0.72     -2.13      0.63       0.77    -0.4  -0.4   0.8  -0.1  -2.1  -1.3  -2.0  -0.3
+alt-n low          -0.75     -2.50      0.53       0.79    -0.4  -0.3   0.8  -0.0  -2.5  -1.3  -2.0  -0.4
+ratio low          -0.88     -2.37      0.55       0.72    -0.7  -0.5   0.7  -0.1  -2.4  -1.4  -2.1  -0.5
+both near          -0.72     -2.08      0.63       0.77    -1.0   0.1   1.0  -0.1  -2.1  -1.0  -1.7  -0.9
+alt near           -0.86     -2.17      0.55       0.72    -0.8  -0.1   0.7  -0.3  -2.2  -1.2  -2.0  -1.0
+alt-n near         -0.88     -2.48      0.58       0.71    -1.0  -0.1   0.8  -0.3  -2.5  -1.1  -2.0  -0.9
+ratio near         -1.04     -2.61      0.51       0.63    -1.3  -0.2   0.7  -0.2  -2.6  -1.3  -2.2  -1.2
+
+
+15 mask shifts (+-5 mm) per shape; LED positions (x, mm above slit, mm in front): mid: L (45, 11, 64) R (-45, 11, 64); low: L (45, -9, 64) R (-45, -9, 64); near: L (45, 11, 44) R (-45, 11, 44)
+sep = log(between-shape distance / within-shape spread from the shifts) on the 80x60 net input
+acc = nearest-centroid accuracy, leave-one-out over the shifts (lips: neutral/pucker/funnel/pucker_up/jaw)
