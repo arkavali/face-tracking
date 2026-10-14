@@ -1,0 +1,15 @@
+# One venv for all trackers (Python 3.9), at the repo root: .venv
+numpy==2.0.2
+opencv-python==5.0.0.93
+opencv-contrib-python==5.0.0.93
+matplotlib==3.9.4
+pyserial==3.5
+mediapipe==1.1.0        # brows: teacher labels and simulator
+gmsh==4.15.2            # brows: mask geometry
+onnx==1.19.1            # mouth: model export
+onnxruntime-gpu==1.19.2 # mouth: teacher model and live view
+ziglang==0.16.0         # parity tests: builds the C++ cores as host DLLs
+# torch: install the CUDA build separately, e.g.
+#   pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+# Optional GPU for the simulators:
+# cupy-cuda12x==13.6.0 nvidia-cuda-runtime-cu12 nvidia-curand-cu12 nvidia-cuda-nvrtc-cu12 nvidia-cublas-cu12

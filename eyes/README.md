@@ -1,8 +1,8 @@
-# eye_tracker
+# eyes
 
 Gaze, blink and squint tracking for the Arka'vali mask: one ESP32-S3 CAM (OV2640, 66 deg,
 no IR filter) per eye, plain image maths on the chip, results sent to the hub. Sibling of
-`../brow_tracker` (same layout, same venv).
+`../brows` (same layout, same venv).
 
 Method base: JEOresearch 3DTracker (darkest-area seed, pupil ellipse, eyeball centre from
 the minor axes of many pupil ellipses, gaze = centre -> pupil), reworked for the ESP:
@@ -41,7 +41,7 @@ Measured on real boards (2026-10-10):
 - The brow tracker's AI-Thinker ESP32-CAM (env `esp32cam`, its real OV2640): camera at
   25 fps with tracking, 18 ms per frame when no pupil is in view (seed 9 ms: the classic
   ESP32 reads PSRAM slower). Its brow firmware: `../_backups/esp32cam_brow_COM3_2026-10-10.bin`
-  or `../brow_tracker/flash_firmware.bat`.
+  or `../brows/flash_firmware.bat`.
 
 The pupil seed box is a per-placement setting (`box` command): 16 px behind the AR
 mirror (noisy frames), 8 px from below.
@@ -69,13 +69,13 @@ mirror (noisy frames), 8 px from below.
 
 Placement comparison: [docs/placement.md](docs/placement.md).
 
-Setup: uses `../brow_tracker/.venv` (Python 3.9, numpy, opencv-python, matplotlib). GPU,
+Setup: uses `../.venv` (Python 3.9, numpy, opencv-python, matplotlib). GPU,
 ready but not used by the renderer yet: `cupy-cuda12x` + `nvidia-cuda-runtime-cu12`,
 `nvidia-curand-cu12`, `nvidia-cuda-nvrtc-cu12`, `nvidia-cublas-cu12` in the same venv;
 `from gpu import cp` (tools/gpu.py) loads CuPy on the RTX 5070 (None without a GPU).
 
 ```
-PY=../brow_tracker/.venv/Scripts/python
+PY=../.venv/Scripts/python
 cd tools
 $PY preview.py
 $PY render_seq.py            # ~10 min, all placements

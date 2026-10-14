@@ -1,7 +1,7 @@
-# mouth_tracker
+# mouth
 
 Mouth / jaw tracking for the Arka'vali mask: a camera inside the beak, on an ESP32(-S3) CAM
-node, raw values to the hub. Sibling of `../eye_tracker` and `../brow_tracker` (same venv).
+node, raw values to the hub. Sibling of `../eyes` and `../brows` (same venv).
 Survey, camera choice and placement: [docs/survey.md](docs/survey.md).
 
 ## Quick start (double-click in the repo folder)
@@ -14,7 +14,7 @@ Survey, camera choice and placement: [docs/survey.md](docs/survey.md).
 | `mouth_board.bat` | The model running on the ESP32-CAM itself (~10 fps, 93 ms per frame): bars from the board |
 | `mouth_cam.bat [COMx]` | Live view; R records to `out/cam/rec_*` (frames.mjpeg + frames.csv), S snapshot, L flash LED, Q quit |
 
-The brow firmware for the same board: `../brow_tracker/flash_firmware.bat`.
+The brow firmware for the same board: `../brows/flash_firmware.bat`.
 
 ## Firmware (`firmware/`)
 
@@ -43,9 +43,9 @@ QVGA -> 4x box downscale to 80x60 -> `lib/mouth_net` (float CNN, weights from
 | `lipshapes.py`, `rt.py` | Mouth shape deformations of the head mesh; CUDA ray-triangle kernel |
 | `synth.py` | Synthetic frames + trained-net comparison of lighting variants (`render` / `train`, `--set`) |
 | `configs_catalog.py` | Writes `docs/lighting_configs.md/.json` (every tried LED config with results) |
-| `gpu.py` | CuPy loader (copy of `../eye_tracker/tools/gpu.py`) |
+| `gpu.py` | CuPy loader (copy of `../eyes/tools/gpu.py`) |
 
 `data/head.bin`, `data/mask.bin` (not in git): meshes dumped from the open Fusion document with a
 read-only script through `fusion_mcp.py` (`ImageToStl.com_vhs+` mesh body, `forehead R` body).
 
-Setup: `../brow_tracker/.venv` (Python 3.9, numpy, opencv, matplotlib, pyserial, cupy-cuda12x).
+Setup: `../.venv` (Python 3.9, numpy, opencv, matplotlib, pyserial, cupy-cuda12x).

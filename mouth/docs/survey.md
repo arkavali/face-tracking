@@ -1,7 +1,7 @@
 # Mouth tracking for the Arka'vali mask: survey and plan
 
 Goal: jaw / lip expression of the wearer from a small camera inside the muzzle, computed on an
-ESP32-S3 CAM node (like `../eye_tracker` and `../brow_tracker`), raw values sent to the hub,
+ESP32-S3 CAM node (like `../eyes` and `../brows`), raw values sent to the hub,
 which drives the jaw motors and LED reactions.
 
 ## Existing open trackers (checked 2026-10-11)
@@ -69,9 +69,9 @@ whether the jaw of the mask moves in front of the camera.
    VRCFaceTracking if ever needed.
 
 Sim: the brow_tracker head models plus a parametric jaw/lip rig can render the IR view from
-candidate muzzle positions for a placement sweep (as in `../eye_tracker/docs/placement.md`)
+candidate muzzle positions for a placement sweep (as in `../eyes/docs/placement.md`)
 once the muzzle geometry is known. The renderer is to be written for the GPU from the start
-(CuPy via `../eye_tracker/tools/gpu.py`, RTX 5070), with a NumPy fallback.
+(CuPy via `../eyes/tools/gpu.py`, RTX 5070), with a NumPy fallback.
 
 ## Placement sweep (2026-10-11, `tools/sweep.py`, `tools/preview.py`)
 

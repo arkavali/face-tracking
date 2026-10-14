@@ -1,4 +1,4 @@
-# brow_tracker
+# brows
 
 Feasibility study for tracking the wearer's eyebrows with a small camera inside the
 Arka'vali mask, using plain image maths that can run on an ESP32 (no neural network,
@@ -81,15 +81,15 @@ The ROI must start below the hairline (hair is a thick dark band too).
 | `parity_test.py` | C++ core (`firmware/lib/brow_core`) vs Python reference on a video |
 | `blender_inspect_mask.py`, `step_parts.py` | Mask model inspection (STL parts, STEP solids) |
 
-Setup: Python 3.9 venv in `.venv` with `mediapipe opencv-python numpy matplotlib gmsh`.
-Datasets live outside the repo in `../_datasets` (RAVDESS speech videos, CC BY-NC-SA 4.0,
-https://zenodo.org/records/1188976; the user's own clips in `../_datasets/own`).
+Setup: Python 3.9 venv in `../.venv` (shared by all trackers) with `mediapipe opencv-python numpy matplotlib gmsh`.
+Datasets live outside the repo in `../../_datasets` (override with `FACE_DATASETS`) (RAVDESS speech videos, CC BY-NC-SA 4.0,
+https://zenodo.org/records/1188976; the user's own clips in `_datasets/own`).
 
 ```
-.venv/Scripts/python tools/teacher.py --actors 1 2 3
-.venv/Scripts/python tools/sweep.py tools/jobs_v3.txt -j 28
-.venv/Scripts/python tools/metrics.py h_red_v3
-.venv/Scripts/python tools/report.py
+../.venv/Scripts/python tools/teacher.py --actors 1 2 3
+../.venv/Scripts/python tools/sweep.py tools/jobs_v3.txt -j 28
+../.venv/Scripts/python tools/metrics.py h_red_v3
+../.venv/Scripts/python tools/report.py
 ```
 
 ## Simulator limits (read before trusting numbers)

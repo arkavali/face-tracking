@@ -1,6 +1,7 @@
 """Shared paths, landmark index sets and dataset helpers for the brow tracker tools."""
 from __future__ import annotations
 
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -8,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent
-DATASETS = REPO.parent / "_datasets"
+DATASETS = Path(os.environ.get("FACE_DATASETS", REPO.parent.parent / "_datasets"))
 RAVDESS = DATASETS / "ravdess"
 OUT = REPO / "out"
 MODEL = REPO / "sim" / "vendor" / "mediapipe" / "face_landmarker.task"
