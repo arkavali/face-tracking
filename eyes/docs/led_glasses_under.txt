@@ -1,0 +1,11 @@
+under_ledtop with glasses (4% per surface); 24 gaze directions
+LEDs                               2 corneal glints  lens refl. visible  min dist to pupil (median, px)
+sides, eye level, z45                           46%               100%      79
+sides, eye level, z35                           38%               100%     122
+sides, wide, z40                                33%               100%     119
+sides, low, z45                                 17%               100%      74
+sides, high, z45                               100%               100%     101
+top corners, z45                               100%               100%     114
+bottom corners, z45                              0%               100%      83
+next to camera (behind mirror)                  25%               100%       5
+inside the lens gap, sides z20                  25%                 0%       -
