@@ -1,0 +1,19 @@
+# Main sweep with the corrected holder model (mirror frame + diagonal arm), 2026-10-09.
+# Geometry
+h_red_v3 --cam-y 57 --cam-z 39 --method ncc
+h_red_low10_v3 --cam-y 57 --cam-z 39 --flange-top 19 --method ncc
+h_steep_v3 --cam-y 70 --cam-z 30 --method ncc
+h_close_v3 --cam-y 50 --cam-z 25 --method ncc
+h_vclose_v3 --cam-y 45 --cam-z 15 --method ncc
+h_center_v3 --mode center --cam-y 57 --cam-z 39 --method ncc
+h_center_w_v3 --mode center --cam-y 57 --cam-z 39 --dfov 150 --method ncc
+# Tracker method
+h_red_edge_v3 --cam-y 57 --cam-z 39 --method edge
+# Lighting, appearance, sensor
+l_below_v3 --cam-y 57 --cam-z 39 --lights cam,below --method ncc
+l_ir05_v3 --cam-y 57 --cam-z 39 --ir 0.5 --method ncc
+l_noise6_v3 --cam-y 57 --cam-z 39 --noise 6 --method ncc
+l_glasses_v3 --cam-y 57 --cam-z 39 --glasses --method ncc
+r_160_v3 --cam-y 57 --cam-z 39 --res 160x120 --method ncc
+h_low10_close_v3 --cam-y 50 --cam-z 25 --flange-top 19 --method ncc
+h_lateral_v3 --cam-y 57 --cam-z 39 --method ncc --lateral 10
