@@ -82,6 +82,7 @@ The ROI must start below the hairline (hair is a thick dark band too).
 | `blender_inspect_mask.py`, `step_parts.py` | Mask model inspection (STL parts, STEP solids) |
 
 Setup: Python 3.9 venv in `../.venv` (shared by all trackers) with `mediapipe opencv-python numpy matplotlib gmsh`.
+Model for `teacher.py`: run `tools/fetch_model.py` once (downloads `models/face_landmarker.task`).
 Datasets live outside the repo in `../../_datasets` (override with `FACE_DATASETS`) (RAVDESS speech videos, CC BY-NC-SA 4.0,
 https://zenodo.org/records/1188976; the user's own clips in `_datasets/own`).
 

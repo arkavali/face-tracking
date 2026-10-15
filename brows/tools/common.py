@@ -12,7 +12,7 @@ REPO = Path(__file__).resolve().parent.parent
 DATASETS = Path(os.environ.get("FACE_DATASETS", REPO.parent.parent / "_datasets"))
 RAVDESS = DATASETS / "ravdess"
 OUT = REPO / "out"
-MODEL = REPO / "sim" / "vendor" / "mediapipe" / "face_landmarker.task"
+MODEL = REPO / "models" / "face_landmarker.task"
 
 # MediaPipe face mesh indices. "Right"/"left" are the subject's own sides, so the
 # subject's right brow is on the image LEFT in a frontal (non-mirrored) video.
