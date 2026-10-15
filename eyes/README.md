@@ -40,8 +40,8 @@ Measured on real boards (2026-10-10):
   around the seed (pixels outside it are computed on demand, same values), the fit is float.
 - The brow tracker's AI-Thinker ESP32-CAM (env `esp32cam`, its real OV2640): camera at
   25 fps with tracking, 18 ms per frame when no pupil is in view (seed 9 ms: the classic
-  ESP32 reads PSRAM slower). Its brow firmware: `../_backups/esp32cam_brow_COM3_2026-10-10.bin`
-  or `../brows/flash_firmware.bat`.
+  ESP32 reads PSRAM slower). Back to the brow firmware:
+  `../brows/flash_firmware.bat`.
 
 The pupil seed box is a per-placement setting (`box` command): 16 px behind the AR
 mirror (noisy frames), 8 px from below.
@@ -54,12 +54,13 @@ mirror (noisy frames), 8 px from below.
 | `sweep.py` | Camera placement sweep (distance x height x side): render, evaluate, heat maps (`out/sweep/`) |
 | `led_glasses.py` | Where LED reflections in a spectacle lens land, per LED position |
 | `placements.py` | Camera/LED placements for one eye (under the AR mirror at several distances, through the combiner) |
-| `preview.py` | Contact sheet: placements x eye states (`out/preview.png`) |
+| `preview.py` | Contact sheet: placements x eye states (`out/preview.png`; examples in `docs/preview_glasses.png`, `docs/preview_narrow.png`) |
 | `sequence.py` | 25 fps sequences: 9-point calibration, fixations/saccades/pursuit, blinks, squints, pupil size drift, mask slip |
 | `render_seq.py` | Render a sequence per placement to `out/seq/*.npz` (parallel) |
 | `pupil.py` | Pupil detector (seed, starburst, RANSAC ellipse) written for an ESP port |
 | `eyemodel.py` | Incremental eye-sphere model, gaze vector, polynomial calibration |
 | `evaluate.py` | Detector + model + calibrations (pupil, pupil-glint, pupil-centre, model) on rendered sequences vs ground truth (`out/eval/`) |
+| `ir_meter.py` | Relative IR irradiance of an LED vs a reference light, using a camera with locked exposure |
 | `own_video.py` | Detector on the user's phone clips (visible light, geometry check only) |
 | `dbg_detect.py` | Debug sheet: edge points and ellipses on the preview states |
 | `lids.py` | Patch-regression eyelid estimator (did not generalise on the simulated lids; kept for real footage) |

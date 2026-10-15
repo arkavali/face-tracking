@@ -1,7 +1,7 @@
 """Head + mask meshes (exported from the Fusion design, mm) and GPU ray casting.
 
 Frame (Fusion): x = wearer's left/right, y = up, z = forward (out of the face).
-data/head.bin, data/mask.bin come from fusion_mcp.py + the dump script in README.
+data/head.bin, data/mask.bin: meshes exported from the suit CAD (not published; format in README).
 """
 from __future__ import annotations
 

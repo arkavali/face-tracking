@@ -130,7 +130,7 @@ Layout score = how far apart the shapes stay in the 80x60 net input relative to 
   The net only grows in its first layer (+16 % MAC). Open points: frame/LED tagging, switching in
   vertical blanking, locked exposure, ambient (dark) frame, recorder for pairs, LED drivers, a
   fallback when one LED fails.
-  **Simulation check (`tools/ledsim2ch.py`, `led_report_2ch.txt`): no gain.** With 15 random
+  **Simulation check (`tools/ledsim2ch.py`, `led_report_2ch.txt`, `led_2ch.png`): no gain.** With 15 random
   +-5 mm mask shifts, L/R as two channels (common or separate exposure) or a (L-R)/(L+R) ratio
   channel separate the shapes no better than both side LEDs on at once (mean log separation
   -0.65..-1.09 vs -0.52..-0.63; nearest-centroid accuracy 0.46-0.58 vs 0.59-0.65), also with a

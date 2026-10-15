@@ -72,6 +72,8 @@ The ROI must start below the hairline (hair is a thick dark band too).
 | `camsim.py` | Mask-camera simulator: re-renders a frontal frame as seen by a fisheye camera fixed to the head above the AR mirror holder (mesh warp from MediaPipe landmarks, IR-like texture, LED lighting on the neutral face shape, holder and glasses occluders) |
 | `evaluate.py` / `sweep.py` | Run the tracker on simulated footage of RAVDESS actors, compare with MediaPipe; `sweep.py` runs many configs in parallel (one thread per job) |
 | `eval_own.py` | Same for one arbitrary frontal video |
+| `prepare_ravdess.py` | Unpack the downloaded RAVDESS actor archives (video-only clips) |
+| `frown_check.py` | Frown proxy check: tracker inner-end lowering vs MediaPipe browDown (feasibility.md) |
 | `stab_eval.py` | Tracker vs MediaPipe on REAL frontal footage aligned to a neutral frame (no 3D re-rendering) |
 | `track_video.py` | Tracker on real top-down footage (e.g. phone above the brows) with hand-placed ROIs |
 | `metrics.py`, `plots.py`, `report.py` | Summaries, time-series plots, `out/report.html` |

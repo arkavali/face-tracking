@@ -53,7 +53,7 @@ Findings
 6. **Glasses (the user will wear them; -2 D uncoated lens 12 mm from the cornea, frame
    rim, both lens surfaces mirror the LEDs).** Each LED shows up twice more as a big
    saturated disc. Where it lands depends only on where the LED sits
-   (`led_glasses.txt`): LEDs next to the camera behind the mirror put the reflection
+   (`led_glasses_thru.txt`, `led_glasses_under.txt`): LEDs next to the camera behind the mirror put the reflection
    right on the pupil (5-14 px away) and detection collapses to 62%; LEDs on the mirror
    frame's sides or top corners keep it 65-120 px away. Through the mirror with side
    LEDs, tracking with glasses holds: pupil found 95%, blinks 97% caught, pupil-glint
@@ -62,7 +62,7 @@ Findings
    (as in the user's clip) and detection falls to 64%. An anti-reflection coating only
    dims the reflections (still saturated in the sim at 0.8% per surface). Best LED spots
    with glasses: top corners of the mirror frame, or the sides set wide (+-32 mm).
-7. **How freely can the camera sit? (sweep, `tools/sweep.py`, `sweep_heat.png`).**
+7. **How freely can the camera sit? (sweep, `tools/sweep.py`, `sweep_heat.png`, `sweep_report.txt`).**
    54 positions: 30 / 45 / 65 mm from the cornea, 50 deg below to 25 deg above the line of
    sight, straight / 25 deg towards the nose / 25 deg towards the temple; glasses, narrow
    lids, LEDs on the mirror frame sides; 30 s each (ss=1, checked against ss=2: same).

@@ -32,7 +32,6 @@ QVGA -> 4x box downscale to 80x60 -> `lib/mouth_net` (float CNN, weights from
 | `scene.py` | Head + mask meshes (from the Fusion design) and GPU ray casting (CuPy, numpy fallback) |
 | `sweep.py` | Camera placement sweep in the beak for 120/160/66 deg lenses (`out/sweep/`) |
 | `preview.py` | IR-like render of the camera view from given placements (`out/preview.png`) |
-| `fusion_mcp.py` | Minimal client for Fusion's local MCP server (read-only scripts, mesh export) |
 | `mouth_cam.py` | Serial live view / recorder for the streamer |
 | `calib_rec.py` | Prompted calibration recorder; own channel set (`CHANNELS`), labels = target x envelope |
 | `teacher.py` | Babble face model (data/babble_face.onnx, non-commercial licence) on recordings -> babble.npz |
@@ -45,7 +44,8 @@ QVGA -> 4x box downscale to 80x60 -> `lib/mouth_net` (float CNN, weights from
 | `configs_catalog.py` | Writes `docs/lighting_configs.md/.json` (every tried LED config with results) |
 | `gpu.py` | CuPy loader (copy of `../eyes/tools/gpu.py`) |
 
-`data/head.bin`, `data/mask.bin` (not in git): meshes dumped from the open Fusion document with a
-read-only script through `fusion_mcp.py` (`ImageToStl.com_vhs+` mesh body, `forehead R` body).
+`data/head.bin`, `data/mask.bin` (not in git): head and mask meshes exported from the suit's
+Fusion design (not published). Format: int32 vertex and triangle counts, float64 xyz in cm,
+int32 triangle indices (see `tools/scene.py`).
 
 Setup: `../.venv` (Python 3.9, numpy, opencv, matplotlib, pyserial, cupy-cuda12x).
