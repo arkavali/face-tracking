@@ -15,7 +15,7 @@ such as MediaPipe lose it. So each part of the face gets its own camera, view an
 |---|---|---|---|---|
 | [eyes/](eyes/) | gaze, blink, squint | ESP32-S3 CAM, OV2640 66 deg no-IR, one per eye | pupil ellipse fit (starburst + RANSAC), continuously re-estimated eyeball model | firmware and simulator done, waiting for the S3 boards |
 | [brows/](brows/) | brow raise / frown, left and right | AI-Thinker ESP32-CAM above the mirror holder | plain image maths on the brow patches, no neural net | runs live on the ESP32-CAM, 25 fps camera |
-| [mouth/](mouth/) | jaw, lips | ESP32(-S3) CAM inside the beak, IR LEDs | small CNN (22 outputs) trained on calibration recordings with a teacher model | net runs on a classic ESP32 at ~10 fps; LED lighting study done |
+| [mouth/](mouth/) | jaw, lips | ESP32(-S3) CAM inside the beak, IR LEDs | small CNN (22 outputs) trained on prompted calibration recordings | net runs on a classic ESP32 at ~10 fps; LED lighting study done |
 
 Each folder is self-contained: `firmware/` (PlatformIO), `tools/` (Python, PC side),
 `docs/` (studies and results) and `.bat` launchers for Windows. Start with the folder's
