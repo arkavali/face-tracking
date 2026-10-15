@@ -79,9 +79,8 @@ The ROI must start below the hairline (hair is a thick dark band too).
 | `ui/browui.py` (+ `index.html`, `app.js`, `style.css`) | Brow camera UI: web page + serial bridge (`brow_ui.bat`) |
 | `brow_cam.py` | Minimal command-line serial helper (snap / setup / monitor / cmd) |
 | `parity_test.py` | C++ core (`firmware/lib/brow_core`) vs Python reference on a video |
-| `blender_inspect_mask.py`, `step_parts.py` | Mask model inspection (STL parts, STEP solids) |
 
-Setup: Python 3.9 venv in `../.venv` (shared by all trackers) with `mediapipe opencv-python numpy matplotlib gmsh`.
+Setup: Python 3.9 venv in `../.venv` (shared by all trackers) with `mediapipe opencv-python numpy matplotlib`.
 Model for `teacher.py`: run `tools/fetch_model.py` once (downloads `models/face_landmarker.task`).
 Datasets live outside the repo in `../../_datasets` (override with `FACE_DATASETS`) (RAVDESS speech videos, CC BY-NC-SA 4.0,
 https://zenodo.org/records/1188976; the user's own clips in `_datasets/own`).

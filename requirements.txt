@@ -5,7 +5,6 @@ opencv-contrib-python==5.0.0.93
 matplotlib==3.9.4
 pyserial==3.5
 mediapipe==1.1.0        # brows: teacher labels and simulator
-gmsh==4.15.2            # brows: mask geometry
 onnx==1.19.1            # mouth: model export
 onnxruntime-gpu==1.19.2 # mouth: teacher model and live view
 ziglang==0.16.0         # parity tests: builds the C++ cores as host DLLs

@@ -31,8 +31,7 @@ The Babble model is a personal-use reference only: do not run it as part of anyt
 ## Python packages (`requirements.txt`)
 
 numpy, pyserial, PyTorch (BSD-3-Clause); matplotlib (PSF-based); OpenCV, MediaPipe (Apache-2.0);
-onnx, onnxruntime, CuPy, ziglang (MIT / Apache-2.0); gmsh (GPL-2.0-or-later, used only by
-`brows/tools/step_parts.py` to read the mask STEP file).
+onnx, onnxruntime, CuPy, ziglang (MIT / Apache-2.0).
 
 ## Firmware (fetched by PlatformIO)
 
