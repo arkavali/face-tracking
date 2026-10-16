@@ -90,7 +90,7 @@ y = 99, z = 246 mm; inner beak wall ~125 mm in front of it.
 Recommended: **120 deg, ~55-60 mm in front of the mouth and ~30 mm above it** (just below the
 nose tip, tilted down at the mouth): one step inside the full-cover zone, ~2.5 px/mm, mouth fills
 most of the frame. 66 deg also works but only far forward and high, close to the fan zone, and a
-small mask shift loses the chin. Maps: `placement_sweep.png`; views: `placement_preview.png`.
+small mask shift loses the chin. Maps: `placement_sweep.png`.
 
 Caveats: generic head mesh, not the wearer's face; the mask's jaw/palate are not modelled yet;
 lens FOV taken as diagonal (equidistant fisheye for 120/160 deg).
@@ -102,8 +102,8 @@ shapes are smooth deformations of the Fusion head mesh (jaw open 16 deg, smile, 
 "o", cheek puff; rough, not anatomy). 137 candidate LED positions in the free space of the beak,
 point LEDs with a cos^2 beam aimed at the mouth, shadows, wet-lip highlights, auto exposure.
 Layout score = how far apart the shapes stay in the 80x60 net input relative to the spread from a
-+-5 mm mask shift (mean log ratio over 8 shape pairs). Full table: `led_report.txt`, pictures:
-`led_layouts.png` (rows: LED at the lens, then the best layouts).
++-5 mm mask shift (mean log ratio over 8 shape pairs). Full table: `led_report.txt`.
+Rendered views of the layouts: `tools/ledsim.py` writes them to `out/` (not published: they show the private head mesh).
 
 - One LED at the lens (flat frontal light) is the worst: score -0.76, 58 % of the mouth region
   nearly black after exposure; relief (pucker, "o" rim) barely shows.
@@ -130,7 +130,7 @@ Layout score = how far apart the shapes stay in the 80x60 net input relative to 
   The net only grows in its first layer (+16 % MAC). Open points: frame/LED tagging, switching in
   vertical blanking, locked exposure, ambient (dark) frame, recorder for pairs, LED drivers, a
   fallback when one LED fails.
-  **Simulation check (`tools/ledsim2ch.py`, `led_report_2ch.txt`, `led_2ch.png`): no gain.** With 15 random
+  **Simulation check (`tools/ledsim2ch.py`, `led_report_2ch.txt`): no gain.** With 15 random
   +-5 mm mask shifts, L/R as two channels (common or separate exposure) or a (L-R)/(L+R) ratio
   channel separate the shapes no better than both side LEDs on at once (mean log separation
   -0.65..-1.09 vs -0.52..-0.63; nearest-centroid accuracy 0.46-0.58 vs 0.59-0.65), also with a
@@ -142,14 +142,14 @@ Layout score = how far apart the shapes stay in the 80x60 net input relative to 
 
 ## LED layout, round 2 and trained-net study (2026-10-11/12)
 
-**Round 2 sweep** (`tools/ledsweep2.py`, `led2_report.txt`, `led2_layouts.png`, `led2_map.png`):
+**Round 2 sweep** (`tools/ledsweep2.py`, `led2_report.txt`, `led2_map.png`):
 one diffuse bounce off the inner beak wall (wall sampled into patches, albedo 0 / 0.5 / 0.8),
 769 LED spots incl. near the camera, vertical pairs, triples, crosses. The bounce changes the
 scores by <= 0.05; side pair +-45 mm at mouth height still best by the pixel metric, a cross
 (side pair + vertical pair) slightly better, LEDs closer to the camera worse. Wider pairs
 (+-55-65 mm, `led2_wide_report.txt`) leave less of the mouth dark but separate the shapes worse.
 
-**Trained-net study** (`tools/synth.py`, reports `synth_report_*.txt`, picture `synth_samples.png`):
+**Trained-net study** (`tools/synth.py`, reports `synth_report_*.txt`):
 6000 synthetic frames per LED set = random mixes of 8 mouth deformations (jaw, smile L/R, pucker,
 "o" opening, lips up, cheek puff L/R), random mask shift +-5 mm and aim change, smooth albedo
 pattern, +-15 % LED gain, wall bounce, sensor noise, 8-bit; every LED rendered alone, lighting
@@ -176,7 +176,7 @@ val MAE on 1200 held-out frames (seed spread +-0.001).
   model): outside light can come in there (matters for blinking; a dark frame may be needed).
 - Caveats: synthetic, rough deformations on a generic head, uniform NIR skin with blotches,
   no teeth / tongue; confirm on hardware once the mask is built.
-- **Triangle (user's sketch, `synth_report_triangle.txt`, `synth_triangle.png`)**: top LED
+- **Triangle (user's sketch, `synth_report_triangle.txt`)**: top LED
   between camera and nose (0, +38, +40) or under the lens (0, +22, +55) + two low side LEDs
   (+-35..55, -12..-35, +55..65), 3-channel blinking: 0.027-0.029; top vs both low together
   (2 channels): 0.027; all three lit together: 0.034; reference vertical pair blink 0.026.

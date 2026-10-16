@@ -94,9 +94,9 @@ def main():
         L.append("")
     L += ["## Pixel-metric sweeps (layouts lit together, no trained net)", "",
           "- `tools/ledsim.py` (round 1): 137 spots, x 0/15/30/45, y 70-150, z 270-330 mm absolute -> `led_report.txt`, "
-          "`led_layouts.png`; blinking check `tools/ledsim2ch.py` -> `led_report_2ch.txt`.",
+          "blinking check `tools/ledsim2ch.py` -> `led_report_2ch.txt`.",
           "- `tools/ledsweep2.py` (round 2): 769 spots, x 0/10/20/30/45, y slit-40..+60, z 265-340, wall bounce -> "
-          "`led2_report.txt`, `led2_layouts.png`, `led2_map.png`; wider pairs `--xs 45,55,65,75 --hpairs-only "
+          "`led2_report.txt`, `led2_map.png`; wider pairs `--xs 45,55,65,75 --hpairs-only "
           "--out led2_wide` -> `led2_wide_report.txt`.",
           "- These cannot judge blinking: use `synth.py` with a trained net for that.", "",
           "## Adding an idea", "",
