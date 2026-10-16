@@ -45,4 +45,16 @@ library, so every tracker reports to the hub the same way.
 
 ## Licence
 
-TBD.
+Copyright (C) 2026 arkavali
+
+Everything in this repository (code, firmware, docs and images) is free software: you can
+redistribute it and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License, or (at your
+option) any later version. See [LICENSE](LICENSE).
+
+In short: commercial use is allowed, but anyone who distributes this work or a modified
+version (including firmware inside a device) must keep the copyright notices and publish
+the full source under the same licence.
+
+Third-party models, datasets and packages are not part of this repository and keep their
+own licences: see [THIRD_PARTY.md](THIRD_PARTY.md).
