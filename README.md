@@ -1,5 +1,8 @@
 # face-tracking
 
+>***Work In Progress***
+
+
 Face tracking for **Arka'vali**, a mechatronic Avali fursuit. Small IR cameras inside the
 mask watch the wearer's eyes, brows and mouth; each camera sits on its own ESP32 node that
 runs plain image maths on the chip and sends a few numbers to the suit hub, which drives the
